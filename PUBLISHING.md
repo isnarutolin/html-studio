@@ -156,6 +156,27 @@ grep -rn "/Users/$(whoami)" README.md PUBLISHING.md || echo "✓ 无个人路径
 #    这一步没法自动化，手动做一遍
 ```
 
+## 仓库 About（GitHub 右侧那块）
+
+点仓库页右上角 ⚙️ 编辑。Description 比 README 第一屏更容易被看到，值得单独打磨：
+
+```
+Edit AI-generated HTML in place — click the text, tweak it, Cmd+S writes it back to the
+original file. Chrome extension + optional local web UI. Zero dependencies, automatic
+backups, one-click undo.
+```
+
+Topics（影响被搜到的概率）：
+
+```
+html  html-editor  wysiwyg  contenteditable  chrome-extension  native-messaging
+local-first  ai-generated  no-dependencies  backup  macos  python
+```
+
+再勾上 README 里已经写好的:
+- Website 留空或填 demo 视频链接
+- Releases 里发一个 `v1.0.0`，附一张 zip（点 Code → Download ZIP 也行，但有 Release 显得更正式）
+
 ## 目录建议
 
 公开仓库建议只保留产品代码，把个人安装痕迹清掉：

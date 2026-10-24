@@ -1,0 +1,96 @@
+name: Bug 报告
+description: 装不上、页面没反应、保存失败等
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先看一下 [常见问题](https://github.com/isnarutolin/html-studio/blob/main/docs/FAQ.md) ——
+        排前三个的问题占了绝大多数，可能有现成答案。
+
+        如果 FAQ 没解决，请把下面的信息填全。**没有自检输出的话基本没法定位问题。**
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: 卡在哪一步
+      options:
+        - 扩展装不上（加载已解压的扩展程序时报错）
+        - 本地 html 页面右下角没有 ✎ 按钮
+        - 点了 ✎，但改不了 / 工具条不出现
+        - 点保存报错（有错误提示文字）
+        - 保存了，但文件内容不对 / 格式乱
+        - Cmd+S 没反应
+        - 本地网页版（server.py）的问题
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: 自检输出（必填）
+      description: |
+        在终端运行下面这条命令，把**完整输出**粘进来：
+
+        ```bash
+        cd <你 clone 的目录>/extension && python3 install.py --check
+        ```
+
+        再点一下浏览器里扩展的工具栏图标，把自检页的截图也贴一张。
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 操作系统 + 浏览器版本 + Python 版本
+      placeholder: "macOS 15.2 / Chrome 155.0.8059.85 / Python 3.12.4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 尽量具体，比如"双击 ~/demo.html，点右下角 ✎，改标题，按 Cmd+S"
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为 / 实际行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志（可选）
+      description: |
+        native host 的错误会记在 `~/.html-studio/host.log`：
+        ```bash
+        tail -40 ~/.html-studio/host.log
+        ```
+        扩展报错可以去 `chrome://extensions` → 该扩展 →「错误」/「检查视图 Service Worker」里看。
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 我已经在扩展「详情」页打开了「允许访问文件网址」
+          required: true
+        - label: 我确认打开的是本地 html（地址栏是 file:/// 开头），不是 http://127.0.0.1:7788
+          required: true

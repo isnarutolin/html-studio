@@ -5,6 +5,9 @@ to the original file.** No more asking the model to regenerate the whole page fo
 
 [中文](README.md) · English
 
+> 📖 **[FAQ](docs/FAQ.md)** (Chinese) — covers the most common issues: no ✎ button,
+> "cannot connect to native host", "manifest file is missing or unreadable".
+
 Two form factors, same local save pipeline:
 
 | Form | Best for | Entry point |

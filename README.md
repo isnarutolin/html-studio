@@ -4,6 +4,8 @@
 
 [English](README.en.md) · 中文
 
+> 📖 **[常见问题（FAQ）](docs/FAQ.md)** —— 页面没有 ✎、保存报「无法连接本地 host」等，先看这里。
+
 AI 生成的页面，改一句话就要重新生成一整份 —— 这个工具解决的就是这一步。
 加载后在本地 `.html` 页面里直接点文字改，像改文档一样，保存就是覆盖原文件（自动备份、可撤销）。
 
@@ -126,7 +128,7 @@ python3 service.py uninstall
 | 网页版 | ✅ | ✅ | ✅ |
 | 常驻服务 `service.py` | ✅ launchd | 用 systemd（见上） | — |
 
-欢迎 PR 补 Windows/Linux 实测反馈。
+欢迎 PR 补 Windows/Linux 实测反馈。细节见 [FAQ · 平台支持](docs/FAQ.md#8-windows--linux-能用吗)。
 
 ## 开发者
 

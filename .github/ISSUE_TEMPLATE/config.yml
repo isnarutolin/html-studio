@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 先看常见问题（大部分问题这里就有答案）
+    url: https://github.com/isnarutolin/html-studio/blob/main/docs/FAQ.md
+    about: 页面没有 ✎ 按钮、保存报「无法连接本地 host」、提示「清单文件缺失」等
+  - name: 使用问题 / 想法讨论
+    url: https://github.com/isnarutolin/html-studio/discussions
+    about: 不确定是不是 bug、想问怎么用，来这里

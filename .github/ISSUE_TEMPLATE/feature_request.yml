@@ -1,0 +1,49 @@
+name: 功能建议
+description: 想要什么能力、或者哪里用着别扭
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        功能建议不用填得很完整，说清「你遇到的麻烦」比「你想要的具体方案」更有价值 ——
+        方案我可以想，麻烦只有你知道。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题
+      description: 描述具体场景，而不是直接说方案
+      placeholder: |
+        例如：我一次要改 10 个页面的标题，现在只能一个个打开点 ✎ 改，很烦。
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你设想的方式（可选）
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及哪部分
+      options:
+        - Chrome 扩展（页面内编辑）
+        - 扩展的保存 / 备份 / 撤销
+        - 本地网页版（server.py）
+        - 安装与跨平台支持
+        - 文档
+        - 其他
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: 参与
+      options:
+        - label: 我愿意提 PR 实现这个
+          required: false
