@@ -45,7 +45,7 @@ chrome.runtime.sendNativeMessage('com.narutolin.htmlstudio', { op: 'ping' }, (re
   const err = chrome.runtime.lastError;
   if (err) {
     set('c3', 'bad',
-      '连不上本地服务，保存会失败。在终端跑一次注册脚本，然后<b>完全退出并重开 Chrome</b>：',
+      '连不上本地服务，保存会失败。在终端跑一次注册脚本，然后按 <b>Cmd+Q</b> 完全退出并重开 Chrome（关窗口不算）：',
       `cd ~/html-studio/extension\npython3 install.py\n# 检查：python3 install.py --check\n\n错误信息：${err.message}`);
     return;
   }

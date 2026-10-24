@@ -39,6 +39,34 @@
   /* ---------------- native messaging ---------------- */
   // content script 不能直接调 chrome.runtime.sendNativeMessage（MV3 限制），
   // 必须经 background service worker 转发。
+
+  // 浏览器给的是英文错误码，直接弹给用户等于没提示 —— 翻译成「该怎么办」。
+  const HUMAN_HINTS = [
+    [/native messaging host not found/i,
+      '本地程序没注册上（或浏览器还没重启去读注册信息）。\n' +
+      '在终端运行：python3 extension/install.py\n' +
+      '然后按 Cmd+Q 完全退出浏览器再打开（关窗口不算）。'],
+    [/access to the specified native messaging host is forbidden/i,
+      '扩展 ID 和注册信息对不上。\n' +
+      '运行：python3 extension/install.py --ext-id <你扩展卡片上的 ID>'],
+    [/receiving end does not exist|could not establish connection/i,
+      '扩展的后台服务没有响应。\n' +
+      '到 chrome://extensions 点本扩展的「重新加载」，再刷新这个页面。'],
+    [/host 无响应|no response/i,
+      '本地程序启动后没有返回。看下日志：tail -20 ~/.html-studio/host.log'],
+    [/只允许操作主目录内的文件/,
+      '这个文件不在你的主目录里，出于安全考虑不允许写入。\n' +
+      '把文件移到主目录下再打开（例如 ~/或者 ~/Downloads）。'],
+  ];
+
+  function humanize(msg) {
+    const s = String(msg || '');
+    for (const [re, hint] of HUMAN_HINTS) {
+      if (re.test(s)) return hint;
+    }
+    return s;
+  }
+
   function call(msg) {
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -46,9 +74,9 @@
       try {
         chrome.runtime.sendMessage({ type: 'hs-native', msg }, (resp) => {
           const err = chrome.runtime.lastError;
-          if (err) return done(reject, new Error(err.message || '无法连接本地 host'));
+          if (err) return done(reject, new Error(humanize(err.message || '无法连接本地 host')));
           if (!resp) return done(reject, new Error('本地 host 无响应'));
-          if (resp.ok === false) return done(reject, new Error(resp.error || '本地 host 出错'));
+          if (resp.ok === false) return done(reject, new Error(humanize(resp.error || '本地 host 出错')));
           done(resolve, resp);
         });
       } catch (e) {
@@ -426,7 +454,9 @@
     const t = el('div', 'toast show' + (isErr ? ' err' : ''), msg);
     shadow.appendChild(t);
     clearTimeout(S.toastTimer);
-    S.toastTimer = setTimeout(() => t.classList.remove('show'), isErr ? 5200 : 3000);
+    // 错误提示里有操作指引，给足阅读时间
+    S.toastTimer = setTimeout(() => t.classList.remove('show'),
+      isErr ? 12000 : 3000);
   }
 
   /* ---------------- boot ---------------- */
