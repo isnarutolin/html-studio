@@ -1,0 +1,29 @@
+# ---- 签名私钥：绝对不能提交 ----
+*.pem
+*_signing-key*
+signing-key.pem
+key.pem
+
+# ---- 运行时产生的数据 ----
+.edits/
+*.log
+nohup.out
+.langfuse/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# ---- macOS / 编辑器 ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ---- 本地测试目录 ----
+/tmp-*/
+/test-*/
+scratch/

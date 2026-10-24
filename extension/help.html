@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>HTML Studio · 自检</title>
+<style>
+  :root{--bg:#0f1115;--bg2:#161a21;--bg3:#1d232c;--line:#262d38;--fg:#e6ebf2;--fg2:#8b97a8;
+        --acc:#4f9cf9;--ok:#3fbf7f;--bad:#e5484d;--warn:#e8a33d}
+  *{box-sizing:border-box}
+  body{margin:0;padding:32px 24px 60px;background:var(--bg);color:var(--fg);
+       font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC",system-ui,sans-serif}
+  .wrap{max-width:720px;margin:0 auto}
+  h1{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+  h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 9px var(--ok)}
+  .sub{color:var(--fg2);font-size:12.5px;margin-bottom:24px}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:12px}
+  .row{display:flex;gap:12px;align-items:flex-start}
+  .ic{flex:0 0 20px;font-size:15px;line-height:1.5}
+  .bd{flex:1;min-width:0}
+  .t{font-weight:600;font-size:13.5px}
+  .d{color:var(--fg2);font-size:12.5px;margin-top:2px;word-break:break-word}
+  .ok .ic{color:var(--ok)} .bad .ic{color:var(--bad)} .warn .ic{color:var(--warn)} .wait .ic{color:var(--fg2)}
+  code{background:var(--bg3);border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+       font:12px ui-monospace,Menlo,monospace;word-break:break-all}
+  pre{background:var(--bg3);border:1px solid var(--line);border-radius:7px;padding:9px 11px;
+      overflow:auto;font:12px/1.55 ui-monospace,Menlo,monospace;margin:8px 0 0}
+  button{font:inherit;font-size:12.5px;color:var(--fg);background:var(--bg3);border:1px solid var(--line);
+         border-radius:7px;padding:5px 11px;cursor:pointer;margin-top:9px}
+  button:hover{background:#252d38;border-color:#3a4657}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#04101f;font-weight:700}
+  h2{font-size:13.5px;margin:26px 0 8px;color:var(--fg2);font-weight:600;letter-spacing:.4px}
+  ol{margin:0;padding-left:20px;color:var(--fg2);font-size:13px}
+  ol li{margin:5px 0}
+  ol b{color:var(--fg)}
+  .kbd{background:var(--bg3);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;
+       padding:1px 6px;font:12px ui-monospace,Menlo,monospace;color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="dot"></span>HTML Studio · 自检</h1>
+  <div class="sub">这个页面会实时检查三项前置条件。三项都变绿，本地 html 页面右下角就会出现 ✎。</div>
+
+  <div class="card wait" id="c1">
+    <div class="row"><div class="ic">•</div><div class="bd">
+      <div class="t">扩展已加载</div>
+      <div class="d" id="d1">检查中…</div>
+    </div></div>
+  </div>
+
+  <div class="card wait" id="c2">
+    <div class="row"><div class="ic">•</div><div class="bd">
+      <div class="t">允许访问文件网址 <span style="color:var(--bad)">（最常见的坑）</span></div>
+      <div class="d" id="d2">检查中…</div>
+      <button class="primary" id="btnGo" style="display:none">去开启这个开关</button>
+    </div></div>
+  </div>
+
+  <div class="card wait" id="c3">
+    <div class="row"><div class="ic">•</div><div class="bd">
+      <div class="t">本地读写服务（native host）</div>
+      <div class="d" id="d3">检查中…</div>
+      <pre id="p3" style="display:none"></pre>
+    </div></div>
+  </div>
+
+  <h2>怎么用</h2>
+  <ol>
+    <li>在<b>访达里双击</b>一个本地 <code>.html</code> 文件（地址栏是 <code>file:///...</code> 开头），或者把它拖进浏览器窗口。</li>
+    <li>页面<b>右下角</b>会出现蓝色 <b>✎</b> 圆钮 → 点它进入编辑。</li>
+    <li>直接点文字改，<span class="kbd">Cmd+S</span> 保存回原文件。</li>
+  </ol>
+
+  <h2>为什么在别的页面看不到</h2>
+  <ol>
+    <li>扩展只对 <code>file://</code> 的本地 html 生效。<br>
+        如果你是通过 <code>http://127.0.0.1:7788</code>（网页版）看文件，那个是 http 页面，扩展不会介入 —— 网页版本身就是浏览器内编辑器。</li>
+    <li>扩展没有弹窗面板，所以点工具栏图标不会有小窗口弹出来；它的界面就是注入在页面里的那根工具条。</li>
+    <li>装完扩展或改了「允许访问文件网址」之后，<b>已经打开的本地页面需要刷新一次</b>。</li>
+  </ol>
+</div>
+
+<script src="help.js"></script>
+</body>
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>HTML Studio</title>
+<style>
+  :root{
+    --bg:#0f1115; --bg2:#161a21; --bg3:#1d232c; --line:#262d38;
+    --fg:#e6ebf2; --fg2:#8b97a8; --acc:#4f9cf9; --ok:#3fbf7f; --warn:#e8a33d; --bad:#e5484d;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:13px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC",system-ui,sans-serif;
+       background:var(--bg);color:var(--fg);overflow:hidden}
+  button{font:inherit;color:var(--fg);background:var(--bg3);border:1px solid var(--line);
+         border-radius:6px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+  button:hover{background:#252d38;border-color:#33404f}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--acc);border-color:var(--acc);color:#04101f;font-weight:600}
+  button.primary:hover{filter:brightness(1.08)}
+  button.ghost{background:transparent}
+  button[disabled]{opacity:.4;cursor:default}
+  input,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);
+                 border-radius:6px;padding:6px 9px;outline:none;width:100%}
+  input:focus,textarea:focus{border-color:var(--acc)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#2b3441;border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  #app{display:flex;height:100%}
+  /* ---------- sidebar ---------- */
+  #side{width:266px;flex:0 0 266px;display:flex;flex-direction:column;
+        background:var(--bg2);border-right:1px solid var(--line);min-width:0}
+  #side .brand{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--line)}
+  #side .brand b{font-size:13px;letter-spacing:.3px}
+  #side .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  #side .tools{padding:9px 10px;display:flex;gap:6px;border-bottom:1px solid var(--line)}
+  #side .tools input{flex:1;min-width:0;padding:5px 8px}
+  #rootbar{padding:8px 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+  #rootbar .row{display:flex;gap:6px}
+  #rootbar .row input{padding:4px 7px;font-size:12px}
+  #quickRow button{flex:1;padding:3px 6px;font-size:11px;color:var(--fg2)}
+  #quickRow button.on{color:var(--acc);border-color:#2c4a72;background:#1b2b42}
+  #rootbar .hint{font-size:11px;color:var(--fg2);word-break:break-all}
+  #files{flex:1;overflow:auto;padding:6px}
+  .file{padding:6px 8px;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;gap:1px;
+        border:1px solid transparent;min-width:0}
+  .file:hover{background:#1f2631}
+  .file.active{background:#1b2b42;border-color:#2c4a72}
+  .file .nm{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .file .mt{font-size:11px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .file .mt i{font-style:normal;color:#6d7a8c}
+  .empty{padding:20px 12px;color:var(--fg2);font-size:12px;text-align:center;line-height:1.8}
+
+  /* ---------- main ---------- */
+  #main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+  #topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);
+          border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #filePath{font-size:12.5px;color:var(--fg);max-width:40vw;overflow:hidden;text-overflow:ellipsis;
+            white-space:nowrap;font-weight:600}
+  #filePath.none{color:var(--fg2);font-weight:400}
+  .badge{font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid var(--line);color:var(--fg2)}
+  .badge.dirty{color:var(--warn);border-color:#4a3a14;background:#2a2110}
+  .badge.edit{color:var(--ok);border-color:#1d4030;background:#11251b}
+  .spacer{flex:1}
+  #fmtbar{display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--bg2);
+          border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #fmtbar button{padding:3px 9px;font-size:12px}
+  #fmtbar .sep{width:1px;height:16px;background:var(--line);margin:0 4px}
+  #frameWrap{flex:1;position:relative;background:#fff;min-height:0}
+  #frame{width:100%;height:100%;border:0;display:block;background:#fff}
+
+  /* ---------- panel ---------- */
+  #panel{height:0;overflow:hidden;background:var(--bg2);border-top:1px solid var(--line);
+         display:flex;flex-direction:column;transition:height .16s ease}
+  #panel.open{height:42%}
+  #panel .ph{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);
+             font-size:12px;color:var(--fg2)}
+  #panel .ph b{color:var(--fg);font-size:12.5px}
+  #panelBody{flex:1;overflow:auto;font:11.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;padding:6px 0}
+  .dl{white-space:pre-wrap;word-break:break-all;padding:0 12px}
+  .dl.add{background:rgba(63,191,127,.10);color:#9be8bf}
+  .dl.del{background:rgba(229,72,77,.10);color:#f2a2a5}
+  .dl.hunk{color:var(--acc);background:#141b24;padding:2px 12px}
+  .dl.ctx{color:#7e8b9d}
+
+  /* ---------- toast ---------- */
+  #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);opacity:0;
+         background:#20272f;border:1px solid var(--line);color:var(--fg);padding:9px 16px;
+         border-radius:9px;font-size:12.5px;pointer-events:none;transition:.18s;z-index:60;
+         box-shadow:0 8px 30px rgba(0,0,0,.45)}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------- modal ---------- */
+  .mask{position:fixed;inset:0;background:rgba(6,8,11,.66);display:none;align-items:center;
+        justify-content:center;z-index:50;backdrop-filter:blur(3px)}
+  .mask.show{display:flex}
+  .modal{width:min(680px,92vw);max-height:82vh;background:var(--bg2);border:1px solid var(--line);
+         border-radius:12px;display:flex;flex-direction:column;overflow:hidden;
+         box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .modal h3{margin:0;padding:13px 16px;font-size:13.5px;border-bottom:1px solid var(--line);
+            display:flex;align-items:center;gap:8px}
+  .modal .bd{padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+  .modal .ft{padding:11px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+  .modal textarea{min-height:240px;resize:vertical;font:12px/1.5 ui-monospace,Menlo,monospace}
+  .modal label{font-size:12px;color:var(--fg2)}
+  .bkrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);
+         border-radius:8px;font-size:12px}
+  .bkrow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bkrow .s{color:var(--fg2);font-size:11px}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="brand"><span class="dot"></span><b>HTML Studio</b></div>
+    <div class="tools">
+      <input id="q" placeholder="搜索文件名…">
+      <button id="btnNew" title="新建 / 粘贴 AI 生成的 HTML">＋</button>
+    </div>
+    <div id="rootbar">
+      <div class="row">
+        <input id="rootInput" spellcheck="false">
+        <button id="btnRoot" title="切换工作目录">切换</button>
+      </div>
+      <div class="row" id="quickRow"></div>
+      <div class="hint" id="rootHint"></div>
+    </div>
+    <div id="files"></div>
+  </aside>
+
+  <main id="main">
+    <div id="topbar">
+      <span id="filePath" class="none">未选择文件</span>
+      <span class="badge dirty" id="badgeDirty" style="display:none">未保存</span>
+      <span class="badge edit" id="badgeEdit" style="display:none">编辑中</span>
+      <div class="spacer"></div>
+      <button id="btnEdit" title="切换编辑 / 预览">编辑模式</button>
+      <button id="btnReload" title="放弃修改并重新载入">重新载入</button>
+      <button id="btnUndo" disabled title="撤销上一次保存">撤销保存</button>
+      <button id="btnBackups" title="备份历史">备份</button>
+      <button class="primary" id="btnSave" title="保存到本地文件 (Cmd/Ctrl+S)">保存</button>
+    </div>
+
+    <div id="fmtbar">
+      <button data-cmd="bold" title="加粗"><b>B</b></button>
+      <button data-cmd="italic" title="斜体"><i>I</i></button>
+      <button data-cmd="underline" title="下划线"><u>U</u></button>
+      <button data-cmd="strikeThrough" title="删除线"><s>S</s></button>
+      <span class="sep"></span>
+      <button data-cmd="formatBlock" data-val="h1">H1</button>
+      <button data-cmd="formatBlock" data-val="h2">H2</button>
+      <button data-cmd="formatBlock" data-val="h3">H3</button>
+      <button data-cmd="formatBlock" data-val="p">正文</button>
+      <span class="sep"></span>
+      <button data-cmd="justifyLeft">←</button>
+      <button data-cmd="justifyCenter">↔</button>
+      <button data-cmd="justifyRight">→</button>
+      <span class="sep"></span>
+      <button id="btnLink">链接</button>
+      <button id="btnImg">图片</button>
+      <button data-cmd="removeFormat" title="清除格式">清格式</button>
+      <span class="sep"></span>
+      <button data-cmd="undo" title="撤销">↶</button>
+      <button data-cmd="redo" title="重做">↷</button>
+    </div>
+
+    <div id="frameWrap"><iframe id="frame" title="preview"></iframe></div>
+
+    <div id="panel">
+      <div class="ph"><b id="panelTitle">改动</b><span id="panelSub"></span><div class="spacer"></div>
+        <button class="ghost" id="btnPanelClose">收起</button></div>
+      <div id="panelBody"></div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<!-- 新建 -->
+<div class="mask" id="maskNew">
+  <div class="modal">
+    <h3>新建 / 粘贴 HTML</h3>
+    <div class="bd">
+      <label>文件名（相对工作目录，可带子目录，如 `blog/post.html`）</label>
+      <input id="newName" placeholder="new-page.html">
+      <label>HTML 内容（可直接粘贴 AI 输出的整段代码）</label>
+      <textarea id="newHtml" spellcheck="false" placeholder="<!DOCTYPE html> …"></textarea>
+    </div>
+    <div class="ft">
+      <button class="ghost" data-close>取消</button>
+      <button class="primary" id="btnCreate">创建并打开</button>
+    </div>
+  </div>
+</div>
+
+<!-- 备份 -->
+<div class="mask" id="maskBk">
+  <div class="modal">
+    <h3>备份历史 <span class="badge" id="bkFor"></span></h3>
+    <div class="bd" id="bkList"></div>
+    <div class="ft"><button class="ghost" data-close>关闭</button></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const frame = $('#frame');
+const state = { root:'', files:[], current:null, dirty:false, editing:true, lastBackup:null, panelMode:null };
+
+/* ---------------- api ---------------- */
+async function api(method, url, body){
+  const res = await fetch(url, {
+    method,
+    headers: body ? {'Content-Type':'application/json'} : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(()=>({ok:false, error:'响应解析失败'}));
+  if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+const enc = p => p.split('/').map(encodeURIComponent).join('/');
+
+/* ---------------- toast ---------------- */
+let toastTimer;
+function toast(msg, ms=2200){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), ms);
+}
+
+/* ---------------- files ---------------- */
+function fmtTime(ts){
+  const d = Date.now()/1000 - ts;
+  if (d < 60) return '刚刚';
+  if (d < 3600) return Math.floor(d/60) + ' 分钟前';
+  if (d < 86400) return Math.floor(d/3600) + ' 小时前';
+  if (d < 86400*30) return Math.floor(d/86400) + ' 天前';
+  return new Date(ts*1000).toLocaleDateString();
+}
+
+function renderFiles(){
+  const q = $('#q').value.trim().toLowerCase();
+  const list = state.files.filter(f => !q || f.path.toLowerCase().includes(q));
+  const el = $('#files');
+  if (!list.length){
+    el.innerHTML = `<div class="empty">${state.files.length ? '没有匹配的文件' : '这个目录下没有 .html 文件<br>点右上角 ＋ 新建一个'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(f => `
+    <div class="file ${f.path===state.current?'active':''}" data-p="${f.path.replace(/"/g,'&quot;')}">
+      <div class="nm">${esc(f.name)}</div>
+      <div class="mt">${f.dir ? '<i>'+esc(f.dir)+'</i> · ' : ''}${fmtTime(f.mtime)}</div>
+    </div>`).join('');
+  el.querySelectorAll('.file').forEach(n => n.onclick = () => openFile(n.dataset.p));
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let quickDirs = [];
+
+async function refresh(keepScroll){
+  const d = await api('GET','/api/state');
+  state.root = d.root; state.files = d.files; quickDirs = d.quick || [];
+  $('#rootInput').value = d.root;
+  $('#rootHint').textContent = d.files.length + ' 个 HTML 文件';
+  $('#quickRow').innerHTML = quickDirs.map(q =>
+    `<button data-dir="${esc(q.dir)}" class="${q.dir===d.root?'on':''}">${esc(q.label)}</button>`).join('');
+  $('#quickRow').querySelectorAll('button').forEach(b => b.onclick = () => switchRoot(b.dataset.dir));
+  renderFiles();
+}
+
+async function switchRoot(dir){
+  if (state.dirty && !confirm('当前文件有未保存的修改，确定切换目录？')) return;
+  try {
+    const d = await api('POST','/api/root',{ dir });
+    state.files = d.files; state.root = d.root;
+    state.current = null; state.dirty = false;
+    try { localStorage.setItem('hs_root', d.root); } catch(e2) {}
+    $('#panel').classList.remove('open');
+    await refresh();
+    updateUI();
+    frame.removeAttribute('src');
+    toast('工作目录: ' + d.root);
+  } catch(e){ toast(e.message); }
+}
+
+/* ---------------- open / editor setup ---------------- */
+async function openFile(path){
+  if (state.dirty && !confirm('当前文件有未保存的修改，确定切换？')) return;
+  state.current = path; state.dirty = false; state.lastBackup = null;
+  $('#btnUndo').disabled = true;
+  $('#panel').classList.remove('open');
+  try { localStorage.setItem('hs_file', path); } catch(e) {}
+  renderFiles(); updateUI();
+  frame.src = '/files/' + enc(path) + '?v=' + Date.now();
+}
+
+frame.addEventListener('load', setupEditor);
+
+function setupEditor(){
+  let doc;
+  try { doc = frame.contentDocument; } catch(e){ return; }
+  if (!doc || !doc.body) return;
+
+  doc.__orig = {
+    bodyCE: doc.body.getAttribute('contenteditable'),
+    bodySC: doc.body.getAttribute('spellcheck'),
+  };
+
+  const st = doc.createElement('style');
+  st.id = '__editor_style__';
+  doc.head ? doc.head.appendChild(st) : doc.documentElement.appendChild(st);
+  doc.__style = st;
+
+  doc.addEventListener('click', e => {
+    if (!state.editing) return;
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (a){ e.preventDefault(); }
+  }, true);
+  doc.addEventListener('submit', e => { if (state.editing) e.preventDefault(); }, true);
+  doc.addEventListener('input', markDirty);
+  doc.addEventListener('paste', onPaste);
+  doc.addEventListener('dblclick', onDblClick);
+  doc.addEventListener('keydown', onKeyDown);
+
+  applyMode();
+  updateUI();
+}
+
+function applyMode(){
+  let doc;
+  try { doc = frame.contentDocument; } catch(e){ return; }
+  if (!doc || !doc.body || !doc.__style) return;
+  const on = state.editing;
+  if (on){
+    doc.body.setAttribute('contenteditable','true');
+    doc.body.setAttribute('spellcheck','false');
+    doc.__style.textContent = `
+      html{cursor:text}
+      a{cursor:text!important}
+      img{cursor:pointer}
+      ::selection{background:rgba(79,156,249,.35)}
+      [contenteditable]:focus{outline:none}
+      body:focus{outline:2px dashed rgba(79,156,249,.5) !important; outline-offset:-3px}`;
+  } else {
+    const o = doc.__orig || {};
+    if (o.bodyCE == null) doc.body.removeAttribute('contenteditable');
+    else doc.body.setAttribute('contenteditable', o.bodyCE);
+    if (o.bodySC == null) doc.body.removeAttribute('spellcheck');
+    else doc.body.setAttribute('spellcheck', o.bodySC);
+    doc.__style.textContent = '';
+  }
+}
+
+const SVG_SELF = new Set((
+  'line polygon polyline circle ellipse rect path stop use image ' +
+  'animate animateTransform animateMotion set feBlend feColorMatrix feComposite ' +
+  'feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feDropShadow ' +
+  'feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMergeNode ' +
+  'feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence'
+).split(' '));
+
+// 浏览器序列化会把 <line/> 展开成 <line></line>，在 <svg> 范围内还原成自闭合，
+// 让保存后的 diff 只剩真正的改动。
+function compactSVG(html){
+  const names = [...SVG_SELF].join('|');
+  const re = new RegExp(`<(${names})(\\s[^>]*)?></\\1>`, 'g');
+  return html.replace(/<svg[\s>][\s\S]*?<\/svg>/gi,
+    block => block.replace(re, (m, tag, attrs) => `<${tag}${attrs || ''}/>`));
+}
+
+function getHTML(){
+  const doc = frame.contentDocument;
+  const clone = doc.documentElement.cloneNode(true);
+  const st = clone.querySelector('#__editor_style__');
+  if (st) st.remove();
+  const b = clone.querySelector('body');
+  if (b){
+    const o = doc.__orig || {};
+    if (o.bodyCE == null) b.removeAttribute('contenteditable'); else b.setAttribute('contenteditable', o.bodyCE);
+    if (o.bodySC == null) b.removeAttribute('spellcheck'); else b.setAttribute('spellcheck', o.bodySC);
+  }
+  const dt = doc.doctype;
+  const doctype = dt
+    ? `<!DOCTYPE ${dt.name}${dt.publicId ? ` PUBLIC "${dt.publicId}"` : ''}${dt.systemId ? ` "${dt.systemId}"` : ''}>`
+    : '';
+  return compactSVG((doctype ? doctype + '\n' : '') + clone.outerHTML);
+}
+
+/* ---------------- editing actions ---------------- */
+function markDirty(){ if (!state.dirty){ state.dirty = true; updateUI(); } }
+
+function onKeyDown(e){
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
+  if (mod && e.key.toLowerCase() === 'e'){ e.preventDefault(); toggleEdit(); }
+}
+
+function onDblClick(e){
+  if (!state.editing) return;
+  const img = e.target.closest && e.target.closest('img');
+  if (!img) return;
+  const v = prompt('图片地址（留空则取消）', img.getAttribute('src') || '');
+  if (v == null || !v.trim()) return;
+  img.setAttribute('src', v.trim());
+  markDirty();
+}
+
+async function onPaste(e){
+  if (!state.editing) return;
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  let file = null;
+  for (const it of items){
+    if (it.kind === 'file' && it.type.startsWith('image/')){ file = it.getAsFile(); break; }
+  }
+  if (!file) return;
+  e.preventDefault();
+  try {
+    const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(file); });
+    const { src } = await api('POST','/api/upload',{ path: state.current, dataUrl });
+    insertHTML(`<img src="${esc(src)}" alt="">`);
+    markDirty();
+    toast('图片已存入 assets/ 并插入');
+  } catch(err){ toast('插入图片失败: ' + err.message); }
+}
+
+function insertHTML(html){
+  const doc = frame.contentDocument;
+  doc.body.focus();
+  const sel = doc.getSelection();
+  if (sel && sel.rangeCount && doc.body.contains(sel.anchorNode)){
+    doc.execCommand('insertHTML', false, html);
+  } else {
+    const wrap = doc.createElement('div');
+    wrap.innerHTML = html;
+    while (wrap.firstChild) doc.body.appendChild(wrap.firstChild);
+  }
+}
+
+function exec(cmd, val){
+  const doc = frame.contentDocument;
+  if (!state.editing){ toast('先开启编辑模式'); return; }
+  doc.body.focus();
+  doc.execCommand(cmd, false, val || null);
+  markDirty();
+}
+
+/* ---------------- save / restore ---------------- */
+async function save(){
+  if (!state.current) return;
+  if (!state.editing){ /* 预览态也能保存 */ }
+  try {
+    const html = getHTML();
+    const r = await api('POST','/api/save',{ path: state.current, html });
+    state.dirty = false;
+    if (r.backup) state.lastBackup = { path: state.current, name: r.backup };
+    $('#btnUndo').disabled = !state.lastBackup;
+    updateUI();
+    const f = state.files.find(x => x.path === state.current);
+    if (f) f.mtime = Math.floor(Date.now()/1000);
+    renderFiles();
+    showDiff(r.diff, '保存成功', r.backup ? '备份: ' + r.backup : '');
+    toast('已保存到 ' + state.current);
+  } catch(e){ toast('保存失败: ' + e.message); }
+}
+
+async function undoLast(){
+  if (!state.lastBackup) return;
+  if (!confirm('恢复到保存前的版本？\n' + state.lastBackup.name)) return;
+  try {
+    await api('POST','/api/restore',{ path: state.lastBackup.path, backup: state.lastBackup.name });
+    state.lastBackup = null; $('#btnUndo').disabled = true;
+    const p = state.current;
+    state.current = null; state.dirty = false;
+    openFile(p);
+    toast('已撤销保存');
+  } catch(e){ toast('撤销失败: ' + e.message); }
+}
+
+function showDiff(rows, title, sub){
+  state.panelMode = 'diff';
+  $('#panelTitle').textContent = title || '改动';
+  $('#panelSub').textContent = sub || '';
+  const body = $('#panelBody');
+  if (!rows || !rows.length){
+    body.innerHTML = '<div class="dl ctx" style="padding:14px 12px">内容没有变化</div>';
+  } else {
+    body.innerHTML = rows.map(([tag, text]) => {
+      if (tag === '+') return `<div class="dl add">+ ${esc(text)}</div>`;
+      if (tag === '-') return `<div class="dl del">- ${esc(text)}</div>`;
+      if (tag === '@') return `<div class="dl hunk">${esc(text)}</div>`;
+      return `<div class="dl ctx">  ${esc(text)}</div>`;
+    }).join('');
+  }
+  $('#panel').classList.add('open');
+  body.scrollTop = 0;
+}
+
+/* ---------------- backups modal ---------------- */
+async function showBackups(){
+  if (!state.current) return toast('先打开一个文件');
+  $('#bkFor').textContent = state.current;
+  const list = $('#bkList');
+  list.innerHTML = '<div class="s" style="color:var(--fg2)">加载中…</div>';
+  $('#maskBk').classList.add('show');
+  const { backups } = await api('GET','/api/backups?path=' + encodeURIComponent(state.current));
+  if (!backups.length){
+    list.innerHTML = '<div class="s" style="color:var(--fg2)">还没有备份。第一次保存时会自动生成。</div>';
+    return;
+  }
+  list.innerHTML = backups.map(b => `
+    <div class="bkrow">
+      <div class="t">${esc(b.name)}<div class="s">${fmtTime(b.mtime)} · ${(b.size/1024).toFixed(1)} KB</div></div>
+      <button data-diff="${esc(b.name)}">对比当前</button>
+      <button class="primary" data-restore="${esc(b.name)}">恢复</button>
+    </div>`).join('');
+  list.querySelectorAll('[data-diff]').forEach(btn => btn.onclick = async () => {
+    try {
+      const r = await api('GET', `/api/diff-backup?path=${encodeURIComponent(state.current)}&name=${encodeURIComponent(btn.dataset.diff)}`);
+      $('#maskBk').classList.remove('show');
+      showDiff(r.diff, '备份 vs 当前文件', btn.dataset.diff);
+    } catch(e){ toast(e.message); }
+  });
+  list.querySelectorAll('[data-restore]').forEach(btn => btn.onclick = async () => {
+    if (!confirm('用这个备份覆盖当前文件？' + '\n（当前内容会先备份一次）')) return;
+    try {
+      await api('POST','/api/restore',{ path: state.current, backup: btn.dataset.restore });
+      const p = state.current; state.current = null; state.dirty = false;
+      $('#maskBk').classList.remove('show');
+      openFile(p); toast('已恢复');
+    } catch(e){ toast(e.message); }
+  });
+}
+
+/* ---------------- ui sync ---------------- */
+function updateUI(){
+  const has = !!state.current;
+  const fp = $('#filePath');
+  fp.textContent = has ? state.current : '未选择文件';
+  fp.classList.toggle('none', !has);
+  $('#badgeDirty').style.display = state.dirty ? '' : 'none';
+  $('#badgeEdit').style.display = state.editing && has ? '' : 'none';
+  $('#btnEdit').textContent = state.editing ? '预览模式' : '编辑模式';
+  $('#btnSave').disabled = !has;
+  $('#btnReload').disabled = !has;
+  $('#btnBackups').disabled = !has;
+  document.title = (state.dirty ? '● ' : '') + (has ? state.current : 'HTML Studio');
+}
+
+function toggleEdit(){
+  state.editing = !state.editing;
+  applyMode(); updateUI();
+  toast(state.editing ? '编辑模式：直接点文字修改' : '预览模式：可点击链接');
+}
+
+/* ---------------- wiring ---------------- */
+$('#q').addEventListener('input', renderFiles);
+$('#btnRoot').onclick = () => switchRoot($('#rootInput').value.trim());
+$('#rootInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#btnRoot').click(); });
+
+$('#btnSave').onclick = save;
+$('#btnEdit').onclick = toggleEdit;
+$('#btnUndo').onclick = undoLast;
+$('#btnBackups').onclick = showBackups;
+$('#btnReload').onclick = () => {
+  if (!state.current) return;
+  if (state.dirty && !confirm('放弃未保存的修改？')) return;
+  const p = state.current; state.current = null; state.dirty = false; openFile(p);
+};
+
+document.querySelectorAll('#fmtbar [data-cmd]').forEach(b => {
+  b.onmousedown = e => e.preventDefault();
+  b.onclick = () => exec(b.dataset.cmd, b.dataset.val);
+});
+$('#btnLink').onmousedown = e => e.preventDefault();
+$('#btnLink').onclick = () => {
+  const url = prompt('链接地址', 'https://');
+  if (url) exec('createLink', url);
+};
+$('#btnImg').onclick = () => {
+  const file = document.createElement('input');
+  file.type = 'file'; file.accept = 'image/*';
+  file.onchange = async () => {
+    const f = file.files[0]; if (!f) return;
+    const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+    try {
+      const { src } = await api('POST','/api/upload',{ path: state.current, dataUrl });
+      insertHTML(`<img src="${esc(src)}" alt="">`);
+      markDirty(); toast('图片已插入');
+    } catch(e){ toast(e.message); }
+  };
+  file.click();
+};
+
+$('#btnNew').onclick = () => {
+  $('#newName').value = 'page-' + new Date().toISOString().slice(0,10) + '.html';
+  $('#newHtml').value = '';
+  $('#maskNew').classList.add('show');
+  $('#newName').focus();
+};
+$('#btnCreate').onclick = async () => {
+  const path = $('#newName').value.trim();
+  const html = $('#newHtml').value;
+  if (!path) return toast('填个文件名');
+  try {
+    const r = await api('POST','/api/create',{ path, html });
+    $('#maskNew').classList.remove('show');
+    await refresh();
+    openFile(r.path);
+    toast('已创建 ' + r.path);
+  } catch(e){ toast(e.message); }
+};
+
+$('#btnPanelClose').onclick = () => $('#panel').classList.remove('open');
+document.querySelectorAll('.mask').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+  m.querySelectorAll('[data-close]').forEach(b => b.onclick = () => m.classList.remove('show'));
+});
+
+document.addEventListener('keydown', e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
+  if (e.key === 'Escape') document.querySelectorAll('.mask.show').forEach(m => m.classList.remove('show'));
+});
+window.addEventListener('beforeunload', e => {
+  if (state.dirty){ e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ---------------- boot ---------------- */
+(async function boot(){
+  await refresh();
+  updateUI();
+  // 恢复上次的工作目录和文件，让它像一个固定的日常入口
+  try {
+    const lastRoot = localStorage.getItem('hs_root');
+    if (lastRoot && lastRoot !== state.root) {
+      await api('POST','/api/root',{ dir: lastRoot });
+      await refresh();
+      updateUI();
+    }
+    const lastFile = localStorage.getItem('hs_file');
+    if (lastFile && state.files.some(f => f.path === lastFile)) {
+      openFile(lastFile);
+      toast('已回到上次打开的 ' + lastFile);
+    }
+  } catch(e) { /* 目录被删了之类，忽略 */ }
+})();
+</script>
+</body>
+</html>
