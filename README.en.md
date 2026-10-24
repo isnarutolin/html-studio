@@ -149,6 +149,10 @@ Flow: `content.js` (injected toolbar, shadow DOM isolated from page CSS) → `ba
 (forwards native messaging, because content scripts cannot call `sendNativeMessage` directly) →
 `native_host.py` (actual file I/O).
 
+## Changelog
+
+[CHANGELOG.md](CHANGELOG.md)
+
 ## License
 
 MIT

@@ -150,6 +150,10 @@ python3 extension/install.py --rename-host com.example.htmlstudio
 （转发 native messaging，因为 content script 不能直接调 `sendNativeMessage`）→
 `native_host.py`（真正读写文件）。
 
+## 更新记录
+
+[CHANGELOG.md](CHANGELOG.md)
+
 ## License
 
 MIT
