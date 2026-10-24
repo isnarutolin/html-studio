@@ -177,6 +177,20 @@ local-first  ai-generated  no-dependencies  backup  macos  python
 - Website 留空或填 demo 视频链接
 - Releases 里发一个 `v1.0.0`，附一张 zip（点 Code → Download ZIP 也行，但有 Release 显得更正式）
 
+## 可选增强（不影响发布）
+
+这些都没有也能发，按性价比排序：
+
+1. **demo 录屏 / GIF** —— 效果最好的一项。"点文字改 → Cmd+S → 文件修改时间跳一下"这 5 秒，
+   比任何文字描述都直观。放 `docs/demo.gif`，然后在 README 顶部加一行 `![demo](docs/demo.gif)`。
+   不想录就跳过，首屏的四步流程文字已经够表达了。
+2. **GitHub Release** —— 比只有代码更有"这是个成品"的感觉。`git tag -a v1.0.0` + 发布页贴
+   Release Notes（`CHANGELOG.md` 里有素材）。
+3. **Discussions** —— 开个 Q&A 分类，避免所有问题都变成 issue。
+4. **GitHub Actions** —— 跑 `py_compile` + `tests/e2e_chrome.py`。
+   注意 e2e 需要真 Chrome 和已注册的 native host，在 CI 里要额外装 Chrome，成本较高；
+   只跑语法检查也是合理的最小方案。
+
 ## 目录建议
 
 公开仓库建议只保留产品代码，把个人安装痕迹清掉：

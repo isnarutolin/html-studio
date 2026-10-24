@@ -4,9 +4,6 @@
 
 打开本地 `.html` → 点右下角 **✎** → 像改文档一样直接改 → `Cmd/Ctrl+S` 存回原文件。
 
-<!-- 录好 demo 后：把 GIF 放到 docs/demo.gif，然后把下面这行取消注释 -->
-<!-- ![demo](docs/demo.gif) -->
-
 自动备份 · 一键撤销 · 零依赖 · 无网络请求
 
 [English](README.en.md) · [常见问题](docs/FAQ.md) · [更新记录](CHANGELOG.md)

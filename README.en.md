@@ -5,9 +5,6 @@
 Open a local `.html` → click **✎** in the bottom-right corner → edit the text like a document
 → `Cmd/Ctrl+S` writes it back to the original file.
 
-<!-- After recording a demo: drop the GIF at docs/demo.gif, then uncomment the next line -->
-<!-- ![demo](docs/demo.gif) -->
-
 Automatic backups · One-click undo · Zero dependencies · No network access
 
 [中文](README.md) · [FAQ](docs/FAQ.md) (Chinese) · [Changelog](CHANGELOG.md)
