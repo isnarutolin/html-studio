@@ -1,76 +1,74 @@
 # HTML Studio
 
-**Edit AI-generated HTML content directly in the browser, then press `Cmd/Ctrl+S` to save it back
-to the original file.** No more asking the model to regenerate the whole page for a typo.
+**Edit AI-generated HTML in place — no need to make the model regenerate the whole page.**
 
-[中文](README.md) · English
+Open a local `.html` → click **✎** in the bottom-right corner → edit the text like a document
+→ `Cmd/Ctrl+S` writes it back to the original file.
 
-> 📖 **[FAQ](docs/FAQ.md)** (Chinese) — covers the most common issues: no ✎ button,
-> "cannot connect to native host", "manifest file is missing or unreadable".
+<!-- After recording a demo: drop the GIF at docs/demo.gif, then uncomment the next line -->
+<!-- ![demo](docs/demo.gif) -->
 
-Two form factors, same local save pipeline:
+Automatic backups · One-click undo · Zero dependencies · No network access
 
-| Form | Best for | Entry point |
-| --- | --- | --- |
-| **Chrome extension** | Open any local `.html` and click ✎ in the bottom-right corner | see below |
-| **Local web app** | Browse a file list and edit side by side | `python3 server.py` → <http://127.0.0.1:7788> |
+[中文](README.md) · [FAQ](docs/FAQ.md) (Chinese) · [Changelog](CHANGELOG.md)
 
 ---
 
-## 1. Chrome extension
-
-Extensions can't write to disk (browser security model), so there's a small local companion
-(a *native messaging host*) that does the actual saving, versioned backups and undo.
-It's plain Python standard library — **no third-party dependencies at all**.
-
-### Install
+## 30-second setup
 
 ```bash
 git clone https://github.com/isnarutolin/html-studio.git ~/html-studio
-cd ~/html-studio/extension
-python3 install.py
+cd ~/html-studio/extension && python3 install.py
 ```
 
-The script detects installed Chromium-based browsers (Chrome / Chromium / Brave / Edge / Vivaldi),
-registers the native host, and prints the extension ID plus next steps. Then in the browser:
+Then, in the browser:
 
 1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick the `extension` folder
-2. On the extension card → **Details** → turn on **"Allow access to file URLs"**
-   > ⚠️ **Without this, nothing happens on local pages and there is no error message.** This is the #1 gotcha.
-3. **Fully quit and reopen the browser** (native host registrations are read at startup)
+2. Extension card → **Details** → turn on **"Allow access to file URLs"**
+   ← **without this, nothing happens on local pages and no error is shown**
+3. **Fully quit and reopen the browser**
 
-### Usage
+Now double-click any local `.html` file and edit it.
 
-Double-click a local `.html` file (the address bar must start with `file:///`).
-A blue **✎** appears in the bottom-right corner — click it to start editing.
-
-| Action | |
-| --- | --- |
-| `Cmd/Ctrl+S` | save back to the same file |
-| `Cmd/Ctrl+E` | toggle edit / browse (links clickable) |
-| `Esc` | leave edit mode |
-| double-click an image | replace its URL |
-| paste a screenshot / click "图片" | image is stored in `assets/` next to the file, referenced relatively |
-| toolbar | bold / italic / underline / H1–H3 / paragraph / link / clear formatting / undo / redo |
-| 备份 · 撤销保存 · 另存为 | backup history · undo last save · save as |
-
-An **orange dot** means unsaved changes; closing the tab warns you.
-
-### Self-check page
-
-Not sure which step is missing? **Click the extension's toolbar icon** (🧩 → HTML Studio).
-It opens a live diagnostic page checking three things: extension loaded / file-URL access /
-native host connectivity — and tells you exactly what to fix.
-
-Command line equivalent:
+Stuck? **Click the extension's toolbar icon** — the self-check page tells you exactly what's missing:
 
 ```bash
-python3 install.py --check     # layout + registration + a real ping to the native host
+python3 install.py --check     # CLI equivalent: layout, registration, live ping
 ```
+
+> **Why a local helper program?** Browsers deliberately prevent extensions from writing to disk
+> (otherwise any extension could modify your files). Saving therefore has to go through a native
+> program — that's Chrome's official *native messaging* mechanism. The helper is ~300 lines of
+> plain Python standard library, only touches `.html` files under `$HOME`, has no network access.
+> See [Security model](#security-model).
 
 ---
 
-## 2. Local web app
+## What it does
+
+| | |
+| --- | --- |
+| **Edit** | Click text and type, WYSIWYG; bold / italic / underline / H1–H3 / link / clear formatting / undo / redo |
+| **Save** | `Cmd/Ctrl+S` overwrites the original file; after saving you get a line-by-line diff (green add / red remove) |
+| **Undo** | Automatic backup before every save; "undo save" reverts to the previous version; browse any historical backup |
+| **Images** | Double-click to change a URL; pasting a screenshot stores it in `assets/` next to the file (no base64 bloat) |
+| **Toggle** | `Cmd/Ctrl+E` edit ↔ browse (links clickable); `Esc` to exit |
+
+An **orange dot** means unsaved changes, and closing the tab warns you. Empty content is rejected,
+so a bug can never blank out your source file.
+
+## Self-check page
+
+Not sure which step went wrong? **Click the extension's toolbar icon** (🧩 → HTML Studio).
+It opens a live diagnostic page checking three things: extension loaded / file-URL access /
+native host connectivity — and tells you how to fix whichever one is red.
+
+---
+
+## Local web app
+
+The other path, if you'd rather not install an extension: file list on the left, editor on the right,
+same save/backup pipeline.
 
 ```bash
 cd ~/html-studio
@@ -78,35 +76,35 @@ python3 server.py                  # port 7788, workspace defaults to $HOME
 python3 server.py --dir ~/Downloads --port 8000
 ```
 
-Open <http://127.0.0.1:7788>: pick a file on the left, edit on the right, `Cmd/Ctrl+S` to save.
-Includes search, quick folder switching, and a per-save diff panel (green add / red remove).
+Open <http://127.0.0.1:7788>, then `Cmd/Ctrl+S` to save. Includes search and quick folder switching.
 
-### Run it as a background service (macOS)
+On macOS you can keep it running in the background (starts at login, restarts on crash,
+remembers the last file you had open):
 
 ```bash
-python3 service.py install     # launchd: start at login, restart on crash
-python3 service.py status | restart | uninstall
+python3 service.py install     # registers a launchd agent
+python3 service.py status      # restart / uninstall / logs
 ```
 
-That gives you a permanent bookmarkable entry point, and it remembers the last file you had open.
-
-> Linux: write a systemd user unit. Windows: just run `python server.py` in a terminal.
+> Linux: write a systemd user unit (`ExecStart=python3 .../server.py --no-browser`).
+> Windows: just run `python server.py` in a terminal.
 
 ---
 
 ## Security model
 
-- The native host only accepts files that are **inside `$HOME`**, end with `.html/.htm/.xhtml`,
-  and contain **no hidden path segments**
-- **Empty content is rejected**, so a bug can never blank out your source file
-- **Every write is backed up first**; any historical version can be restored
-- **No network requests, no telemetry, no remote code** — everything is local
+A program that can write to your disk deserves a clear explanation:
+
+- **Only accepts** files inside `$HOME`, ending in `.html/.htm/.xhtml`, with no hidden path segments
+- **Rejects empty content**, so your source file can't be wiped by a bug
+- **Backs up before every write**; any historical version can be restored (restoring also backs up first)
+- **No network requests, no telemetry, no remote code** — everything runs locally
 - The web app binds to `127.0.0.1` only and validates paths against traversal
 
-Backups live in:
+Backup locations:
 
 ```
-~/.html-studio/backups/        # extension: one .bak dir per file
+~/.html-studio/backups/        # extension (one .bak dir per file)
 <workspace>/.edits/backups/    # web app
 ```
 
@@ -115,9 +113,9 @@ Backups live in:
 Saving serializes the live DOM, therefore:
 
 - Text, structure, classes and attributes are preserved; self-closing `<svg>` tags are restored
-- The browser re-normalizes indentation/whitespace once. Measured on a 118-line AI-generated page,
-  changing one word altered 10 lines (1 real change + 3 whitespace normalizations)
-- If a page generates DOM via `<script>` at load time, that generated content gets baked in.
+- The browser re-normalizes indentation/whitespace once. Measured: on a 118-line AI-generated page,
+  changing a single word altered 10 lines (1 real change + 3 whitespace normalizations)
+- If a page generates DOM via `<script>` at load time, that content gets baked in.
   Check the diff afterwards and use "undo save" if it looks wrong — backups protect you
 
 ## Platform support
@@ -135,11 +133,11 @@ PRs with Linux/Windows testing feedback are very welcome.
 ```bash
 python3 -m py_compile server.py service.py extension/native_host.py extension/install.py
 
-# End-to-end test: real Chrome + real native messaging (click ✎ → edit → save → verify on disk).
+# End-to-end test: real Chrome + real native messaging, 15 assertions, no mocks.
 # Uses a throwaway profile; your own browser is untouched.
 python3 tests/e2e_chrome.py
 
-# rebrand: the native host name is duplicated in 4 files; this rewrites all of them
+# Rebrand: the native host name is hardcoded in 4 files; this rewrites all of them
 python3 extension/install.py --rename-host com.example.htmlstudio
 ```
 
@@ -148,10 +146,6 @@ After changing extension code, click **Reload** on the extension card in `chrome
 Flow: `content.js` (injected toolbar, shadow DOM isolated from page CSS) → `background.js`
 (forwards native messaging, because content scripts cannot call `sendNativeMessage` directly) →
 `native_host.py` (actual file I/O).
-
-## Changelog
-
-[CHANGELOG.md](CHANGELOG.md)
 
 ## License
 

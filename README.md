@@ -1,74 +1,67 @@
 # HTML Studio
 
-**直接在 AI 生成的 HTML 上改内容，`Cmd+S` 存回本地原文件，不用再反复跟 AI 对话。**
+**改 AI 生成的 HTML，不用再让 AI 重新生成一遍。**
 
-[English](README.en.md) · 中文
+打开本地 `.html` → 点右下角 **✎** → 像改文档一样直接改 → `Cmd/Ctrl+S` 存回原文件。
 
-> 📖 **[常见问题（FAQ）](docs/FAQ.md)** —— 页面没有 ✎、保存报「无法连接本地 host」等，先看这里。
+<!-- 录好 demo 后：把 GIF 放到 docs/demo.gif，然后把下面这行取消注释 -->
+<!-- ![demo](docs/demo.gif) -->
 
-AI 生成的页面，改一句话就要重新生成一整份 —— 这个工具解决的就是这一步。
-加载后在本地 `.html` 页面里直接点文字改，像改文档一样，保存就是覆盖原文件（自动备份、可撤销）。
+自动备份 · 一键撤销 · 零依赖 · 无网络请求
 
-两种形态，同一套本地保存逻辑：
-
-| 形态 | 适合 | 入口 |
-| --- | --- | --- |
-| **Chrome 扩展** | 想在哪改就在哪改：双击任意本地 html，右下角点 ✎ | 见下 |
-| **本地网页版** | 想一边浏览文件列表一边改 | `python3 server.py` → <http://127.0.0.1:7788> |
+[English](README.en.md) · [常见问题](docs/FAQ.md) · [更新记录](CHANGELOG.md)
 
 ---
 
-## 一、Chrome 扩展
-
-扩展不能直接写磁盘（浏览器安全模型限制），所以配了一个很小的本地程序（native messaging host，
-纯 Python 标准库，无第三方依赖）负责真正的保存、备份、撤销。
-
-### 安装
+## 30 秒上手
 
 ```bash
 git clone https://github.com/isnarutolin/html-studio.git ~/html-studio
-cd ~/html-studio/extension
-python3 install.py
+cd ~/html-studio/extension && python3 install.py
 ```
 
-脚本会自动找到已安装的 Chromium 系浏览器（Chrome / Chromium / Brave / Edge / Vivaldi）并注册本地程序，
-然后打印扩展 ID 和后续步骤。浏览器里要做三件事：
+然后在浏览器里做三步：
 
-1. `chrome://extensions` → 开启**开发者模式** → **加载已解压的扩展程序** → 选这个 `extension` 目录
-2. 扩展卡片 → **详情** → 打开 **「允许访问文件网址」**
-   > ⚠️ **不开这一步，本地 html 页面不会有任何反应，也不会有报错。** 这是最常见的坑。
-3. **完全退出浏览器再重开**（native host 注册在启动时读取）
+1. `chrome://extensions` → 开**开发者模式** → **加载已解压的扩展程序** → 选 `extension` 目录
+2. 卡片 → **详情** → 打开 **「允许访问文件网址」** ← **不开就没反应，而且不报错**
+3. **完全退出浏览器再重开**
 
-### 用起来
+现在双击任意本地 `.html` 就能改。
 
-在访达/Finder 里双击一个本地 `.html`（地址栏是 `file:///...`），右下角出现蓝色 **✎** → 点它开始编辑。
-
-| 操作 | 说明 |
-| --- | --- |
-| `Cmd/Ctrl+S` | 保存回原文件 |
-| `Cmd/Ctrl+E` | 切换 编辑 / 浏览（浏览态链接可点） |
-| `Esc` | 退出编辑 |
-| 双击图片 | 换图片地址 |
-| 粘贴截图 / 点「图片」 | 图片存到该文件旁的 `assets/`，页面用相对路径引用 |
-| 工具条 | 加粗 / 斜体 / 下划线 / H1-H3 / 正文 / 链接 / 清格式 / 撤销 / 重做 |
-| 备份 / 撤销保存 / 另存为 | 见下 |
-
-**橙点**表示有未保存改动，关标签页会拦一下。
-
-### 自检页
-
-忘了哪一步没做？**点浏览器工具栏的扩展图标**（🧩 → HTML Studio），会打开自检页，实时检查三项：
-扩展已加载 / 文件访问权限 / 本地程序连通性。哪项红了就直接告诉你怎么办。
-
-也可以命令行体检：
+卡在哪一步了？**点浏览器工具栏的扩展图标** → 自检页会实时告诉你缺什么：
 
 ```bash
-python3 install.py --check     # 目录规范 + 注册状态 + 真实 ping 一次本地程序
+python3 install.py --check     # 命令行等价版本：目录规范 + 注册状态 + 真实 ping
 ```
+
+> **为什么还要装个本地小程序？** 浏览器的安全模型不允许扩展直接写磁盘（否则任何扩展都能改你文件），
+> 所以保存必须由本地程序配合，这是 Chrome 官方的 native messaging 机制。
+> 那个程序约 300 行、纯 Python 标准库，只碰 `$HOME` 下的 `.html`，不联网、无远程代码 —— 详见 [安全设计](#安全设计)。
 
 ---
 
-## 二、本地网页版
+## 能做什么
+
+| | |
+| --- | --- |
+| **改** | 点文字直接改，所见即所得；加粗 / 斜体 / 下划线 / H1–H3 / 链接 / 清格式 / 撤销重做 |
+| **存** | `Cmd/Ctrl+S` 覆盖原文件，保存后显示逐行 diff（绿增红删） |
+| **后悔** | 每次保存前自动备份；「撤销保存」回到上一次保存前；备份面板可回滚任意版本 |
+| **图片** | 双击换地址；粘贴截图自动存到同目录 `assets/`（不塞 base64，文件不会变胖） |
+| **切换** | `Cmd/Ctrl+E` 编辑 ↔ 浏览（浏览态链接可点）；`Esc` 退出 |
+
+未保存时右下角有**橙点**，关标签页会拦一下；保存空内容会被拒绝，一个 bug 不会清空你的文件。
+
+## 自检页
+
+不确定哪一步没做对，或者点了保存报错 —— **点浏览器工具栏的扩展图标**（🧩 → HTML Studio），
+会打开自检页，实时检查三项：扩展已加载 / 文件访问权限 / 本地程序连通性。哪项红了就直接告诉你怎么办。
+
+---
+
+## 本地网页版
+
+不想装扩展时的另一条路：左边文件列表，右边直接改，同一套保存/备份逻辑。
 
 ```bash
 cd ~/html-studio
@@ -76,31 +69,28 @@ python3 server.py                  # 端口 7788，默认工作目录 = 主目�
 python3 server.py --dir ~/Downloads --port 8000
 ```
 
-打开 <http://127.0.0.1:7788>：左边点文件 → 右边直接改 → `Cmd/Ctrl+S`。
-侧栏有快捷目录切换和搜索；保存后底部面板显示这次改了哪几行（绿加红删）。
+打开 <http://127.0.0.1:7788>，`Cmd/Ctrl+S` 保存。侧栏可搜索、可快捷切换目录。
 
-### 想让它常驻（macOS）
+macOS 上可以让它常驻（开机自启 + 崩溃自动拉起 + 记住上次打开的文件）：
 
 ```bash
-python3 service.py install     # 注册 launchd：开机自启 + 崩溃自动拉起
-python3 service.py status      # 状态
-python3 service.py restart
-python3 service.py uninstall
+python3 service.py install     # 注册 launchd
+python3 service.py status      # restart / uninstall / logs
 ```
 
-装完就是个固定入口，存书签即可。还会记住上次打开的文件。
-
-> Linux 用户：`./start.command` 类似地写个 systemd user unit 即可（`ExecStart=python3 .../server.py --no-browser`）。
-> Windows 用户：直接前台 `python server.py`。
+> Linux 写个 systemd user unit 即可（`ExecStart=python3 .../server.py --no-browser`）；
+> Windows 直接前台 `python server.py`。
 
 ---
 
 ## 安全设计
 
-- 本地程序**只接受**：`$HOME` 内、`.html/.htm/.xhtml` 结尾、路径中不含隐藏目录/文件
-- **拒绝保存空内容**（防止把源文件清成空）
-- **每次写入前自动备份**，可一键回滚到任意历史版本
-- **无任何网络请求，不收集数据，无远程代码**，全部本地
+一个能写你磁盘的程序，值得说清楚它到底能干什么：
+
+- **只接受**：`$HOME` 内、`.html/.htm/.xhtml` 结尾、路径中不含隐藏目录/文件
+- **拒绝保存空内容**，防止误清空源文件
+- **每次写入前自动备份**，可回滚到任意历史版本（恢复前也会再备份，所以恢复也能撤回）
+- **无任何网络请求、不收集数据、无远程代码**，全部本地执行
 - 网页版只监听 `127.0.0.1`，并对 `/files/` 做路径越界校验
 
 备份位置：
@@ -137,10 +127,10 @@ python3 service.py uninstall
 python3 -m py_compile server.py service.py extension/native_host.py extension/install.py
 
 # 端到端测试：真实 Chrome + 真实 native messaging，走完「点 ✎ → 改字 → 保存 → 校验落盘」
-# 用独立临时 profile，不动你正在用的浏览器
+# 15 项断言，无任何 mock；用独立临时 profile，不动你正在用的浏览器
 python3 tests/e2e_chrome.py
 
-# 改品牌（native host 名字是硬编码在 4 个文件里的，用这个命令一次改全）
+# 改品牌（native host 名字硬编码在 4 个文件里，用这个命令一次改全）
 python3 extension/install.py --rename-host com.example.htmlstudio
 ```
 
@@ -149,10 +139,6 @@ python3 extension/install.py --rename-host com.example.htmlstudio
 扩展结构：`content.js`（注入的编辑条，shadow DOM 隔离页面样式）→ `background.js`
 （转发 native messaging，因为 content script 不能直接调 `sendNativeMessage`）→
 `native_host.py`（真正读写文件）。
-
-## 更新记录
-
-[CHANGELOG.md](CHANGELOG.md)
 
 ## License
 
