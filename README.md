@@ -1,144 +1,120 @@
-# HTML Studio
+# html-studio
 
-**改 AI 生成的 HTML，不用再让 AI 重新生成一遍。**
+**AI 生成的 HTML，想改个错别字，不用回头改 prompt。**
 
-打开本地 `.html` → 点右下角 **✎** → 像改文档一样直接改 → `Cmd/Ctrl+S` 存回原文件。
+在页面上点一下就改，保存写回原来的 `.html` 文件——不是另存一份，不是导出 PDF。保存前能看 diff，每一笔改动都有备份。
 
-自动备份 · 一键撤销 · 零依赖 · 无网络请求
+[English](README.en.md) | 简体中文
 
-[English](README.en.md) · [常见问题](docs/FAQ.md) · [更新记录](CHANGELOG.md)
+<!-- TODO: 换成你的真实录屏，2-4 秒的 GIF 比静态图强十倍 -->
+![在页面上直接改字，保存写回原文件](docs/images/hero.gif)
 
 ---
+
+## 它解决什么
+
+你让 AI 生成一份周报、一张看板、一个方案页，生成得挺好，只有一个数字写错了。
+
+**原来的路**：找回那段 prompt → 补一句“把 38% 改成 39%” → 重跑 → 发现全文措辞都变了 → 再逐段对一遍。
+
+**用 html-studio**：打开文件 → 点那个错字 → 改 → `Cmd/Ctrl + S` → 完事。其余部分一个字节没动。
+
+## 和别的方式比
+
+| | 能直接改 | 能写回源文件 | 自动备份 | 要懂源码 |
+| --- | --- | --- | --- | --- |
+| 浏览器 DevTools | ✅ | ❌ 刷新即失效 | ❌ | — |
+| 编辑器 + 浏览器预览 | ✅ | ✅ | 看你自己 | ✅ |
+| 让 AI 重新生成 | ✅ | ✅ | ❌ 全文可能变 | ✅ 会改 prompt |
+| **html-studio** | ✅ | ✅ | ✅ | ❌ |
+
+三种都能改，区别在于**改完还剩什么**。DevTools 关掉就没了，是临时看；编辑器要你在标签里找代码；重新生成是拿确定性换省事。html-studio 只动你指的那一处，落盘前把 diff 摆给你看。
 
 ## 30 秒上手
 
-```bash
-git clone https://github.com/isnarutolin/html-studio.git ~/html-studio
-cd ~/html-studio/extension && python3 install.py
-```
+两个入口，挑一个。
 
-然后在浏览器里做三步：
-
-1. `chrome://extensions` → 开**开发者模式** → **加载已解压的扩展程序** → 选 `extension` 目录
-2. 卡片 → **详情** → 打开 **「允许访问文件网址」** ← **不开就没反应，而且不报错**
-3. **完全退出浏览器再重开**
-
-现在双击任意本地 `.html` 就能改。
-
-卡在哪一步了？**点浏览器工具栏的扩展图标** → 自检页会实时告诉你缺什么：
+### 方式一：Chrome 扩展（推荐，能改任意本地 HTML）
 
 ```bash
-python3 install.py --check     # 命令行等价版本：目录规范 + 注册状态 + 真实 ping
+git clone https://github.com/isnarutolin/html-studio.git
+cd html-studio
+python3 extension/install.py     # 注册 native host，让页面有权限写回磁盘
 ```
 
-> **为什么还要装个本地小程序？** 浏览器的安全模型不允许扩展直接写磁盘（否则任何扩展都能改你文件），
-> 所以保存必须由本地程序配合，这是 Chrome 官方的 native messaging 机制。
-> 那个程序约 300 行、纯 Python 标准库，只碰 `$HOME` 下的 `.html`，不联网、无远程代码 —— 详见 [安全设计](#安全设计)。
+然后 `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选 `extension/` 目录。
 
----
+打开任意本地 `.html`，右上角出现 ✎，点它开始编辑。
 
-## 能做什么
-
-| | |
-| --- | --- |
-| **改** | 点文字直接改，所见即所得；加粗 / 斜体 / 下划线 / H1–H3 / 链接 / 清格式 / 撤销重做 |
-| **存** | `Cmd/Ctrl+S` 覆盖原文件，保存后显示逐行 diff（绿增红删） |
-| **后悔** | 每次保存前自动备份；「撤销保存」回到上一次保存前；备份面板可回滚任意版本 |
-| **图片** | 双击换地址；粘贴截图自动存到同目录 `assets/`（不塞 base64，文件不会变胖） |
-| **切换** | `Cmd/Ctrl+E` 编辑 ↔ 浏览（浏览态链接可点）；`Esc` 退出 |
-
-未保存时右下角有**橙点**，关标签页会拦一下；保存空内容会被拒绝，一个 bug 不会清空你的文件。
-
-> **它不是什么**：不是富文本编辑器，也不是源码编辑器 —— 就是改 AI 页面里那几个字。
-> 哪些功能是刻意不做的、为什么，见 [FAQ · 边界](docs/FAQ.md#11-为什么不做-xxx--这个项目的边界)。
-
-## 自检页
-
-不确定哪一步没做对，或者点了保存报错 —— **点浏览器工具栏的扩展图标**（🧩 → HTML Studio），
-会打开自检页，实时检查三项：扩展已加载 / 文件访问权限 / 本地程序连通性。哪项红了就直接告诉你怎么办。
-
----
-
-## 本地网页版
-
-不想装扩展时的另一条路：左边文件列表，右边直接改，同一套保存/备份逻辑。
+### 方式二：本地网页版（不装扩展）
 
 ```bash
-cd ~/html-studio
-python3 server.py                  # 端口 7788，默认工作目录 = 主目录
-python3 server.py --dir ~/Downloads --port 8000
+python3 server.py --dir ~/Downloads      # 默认端口 7788
 ```
 
-打开 <http://127.0.0.1:7788>，`Cmd/Ctrl+S` 保存。侧栏可搜索、可快捷切换目录。
+打开 <http://127.0.0.1:7788>，左侧是文件列表，右侧直接改，`Cmd/Ctrl + S` 保存。
 
-macOS 上可以让它常驻（开机自启 + 崩溃自动拉起 + 记住上次打开的文件）：
+想让它在 macOS 上常驻（登录自启、崩溃自动拉起、记住固定地址）：
 
 ```bash
-python3 service.py install     # 注册 launchd
-python3 service.py status      # restart / uninstall / logs
+python3 service.py install      # 安装并启动
+python3 service.py status       # 看状态
+python3 service.py logs         # 跟日志
+python3 service.py uninstall    # 卸载
 ```
 
-> Linux 写个 systemd user unit 即可（`ExecStart=python3 .../server.py --no-browser`）；
-> Windows 直接前台 `python server.py`。
+## 保存前先看 diff
 
----
+这是它敢让你直接动生产文件的原因。点保存会弹出逐行 diff，认了才落盘。
 
-## 安全设计
+只改一个数字，落盘就是这一段：
 
-一个能写你磁盘的程序，值得说清楚它到底能干什么：
+```diff
+19c19
+- <p>留存仍然是短板，次月留存 38%，低于目标 6 个百分点。</p>
++ <p>留存仍然是短板，次月留存 39%，低于目标 6 个百分点。</p>
+```
 
-- **只接受**：`$HOME` 内、`.html/.htm/.xhtml` 结尾、路径中不含隐藏目录/文件
-- **拒绝保存空内容**，防止误清空源文件
-- **每次写入前自动备份**，可回滚到任意历史版本（恢复前也会再备份，所以恢复也能撤回）
-- **无任何网络请求、不收集数据、无远程代码**，全部本地执行
-- 网页版只监听 `127.0.0.1`，并对 `/files/` 做路径越界校验
+不满意就点「撤销保存」，源文件原样退回。
+
+## 安全
+
+一个能写你磁盘的东西，值得把边界说清楚：
+
+- 只动 `$HOME` 内的 `.html / .htm / .xhtml`，路径含隐藏目录一律拒绝
+- 拒绝写入空内容，防手滑把源文件清空
+- 每次写盘前自动备份，可回滚到任意历史版本；恢复前再备份一次，所以恢复本身也能撤回
+- 零网络请求、不收集数据、无远程代码，全程本地
+- 网页版只监听 `127.0.0.1`，`/files/` 有路径越界校验
 
 备份位置：
 
 ```
-~/.html-studio/backups/        # 扩展版（每个文件一个 .bak 目录）
-<工作目录>/.edits/backups/     # 网页版
+~/.html-studio/backups/        # 扩展版
+<工作目录>/.edits/backups/      # 网页版
 ```
 
 ## 已知边界
 
-保存是把浏览器当前 DOM 序列化写回文件，所以：
+保存是把页面当前 DOM 序列化写回文件，浏览器会顺手把排版重新规范化一遍：
 
-- 文本、结构、class、属性都保留；`<svg>` 里的自闭合标签做了还原处理
-- 但浏览器会重新规范化一次缩进/换行。实测一个 118 行的 AI 生成页面只改一个词，落盘差 10 行
-  （1 行真实改动 + 3 行空白归一化）
-- 如果页面用 `<script>` 在加载后动态生成 DOM，那部分动态内容也会被写进文件。
-  改这类页面后先看一眼 diff，不对就「撤销保存」—— 有备份兜底
+- 文字、结构、class、属性都保留；`<svg>` 自闭合标签已做还原
+- **缩进和换行会被重排**，`<!doctype html>` 会被规范成 `<!DOCTYPE html>`。改动越大越明显——所以请看 diff，不要盲存
+- 页面若用 `<script>` 动态生成 DOM，那部分也会被一起写进文件。改这类页面先看 diff，不对就撤销，有备份兜底
 
-## 平台支持
+## 平台
 
-| | macOS | Linux | Windows |
-| --- | --- | --- | --- |
-| 扩展 + native host | ✅ | ✅ 逻辑相同，未实机验证 | ⚠️ 实验性（注册表 + `.cmd` 启动器，未实测） |
-| 网页版 | ✅ | ✅ | ✅ |
-| 常驻服务 `service.py` | ✅ launchd | 用 systemd（见上） | — |
-
-欢迎 PR 补 Windows/Linux 实测反馈。细节见 [FAQ · 平台支持](docs/FAQ.md#8-windows--linux-能用吗)。
+macOS 完整支持。Linux 逻辑相同但未实机验证。Windows 的扩展部分为实验性（注册表 + `.cmd` 启动器），网页版三平台通用。细节见 [FAQ](docs/FAQ.md)。
 
 ## 开发者
 
 ```bash
-# 语法检查
-python3 -m py_compile server.py service.py extension/native_host.py extension/install.py
-
-# 端到端测试：真实 Chrome + 真实 native messaging，走完「点 ✎ → 改字 → 保存 → 校验落盘」
-# 15 项断言，无任何 mock；用独立临时 profile，不动你正在用的浏览器
-python3 tests/e2e_chrome.py
-
-# 改品牌（native host 名字硬编码在 4 个文件里，用这个命令一次改全）
-python3 extension/install.py --rename-host com.example.htmlstudio
+python3 tests/e2e_chrome.py      # 真 Chrome + 真 native messaging，端到端 15 项断言
 ```
 
-浏览器里改了扩展代码后，**要在 `chrome://extensions` 点该扩展的「重新加载」**才会生效。
+一条链路：`content.js`（注入编辑条，shadow DOM 隔离样式）→ `background.js`（转发消息，content script 不能直接调 `sendNativeMessage`）→ `native_host.py`（校验 + 读写文件）。改完扩展代码记得回 `chrome://extensions` 点「重新加载」。
 
-扩展结构：`content.js`（注入的编辑条，shadow DOM 隔离页面样式）→ `background.js`
-（转发 native messaging，因为 content script 不能直接调 `sendNativeMessage`）→
-`native_host.py`（真正读写文件）。
+提 PR 前先跑一遍 `tests/e2e_chrome.py`，它覆盖了保存、备份、回滚、路径校验这几条主路径。
 
 ## License
 
