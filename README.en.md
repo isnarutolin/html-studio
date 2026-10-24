@@ -54,6 +54,10 @@ python3 install.py --check     # CLI equivalent: layout, registration, live ping
 An **orange dot** means unsaved changes, and closing the tab warns you. Empty content is rejected,
 so a bug can never blank out your source file.
 
+> **What it is not**: not a rich-text editor, not an HTML source editor — it's for fixing the few
+> words in a page AI already generated. Deliberate non-goals are documented in
+> [FAQ · scope](docs/FAQ.md#11-为什么不做-xxx--这个项目的边界) (Chinese).
+
 ## Self-check page
 
 Not sure which step went wrong? **Click the extension's toolbar icon** (🧩 → HTML Studio).
