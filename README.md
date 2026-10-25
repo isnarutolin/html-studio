@@ -6,8 +6,7 @@
 
 [English](README.en.md) | 简体中文
 
-![Uploading 20261025222234.gif…]()
-
+![在页面上直接改字，保存写回原文件](docs/images/hero.gif)
 
 ---
 
