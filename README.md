@@ -41,9 +41,14 @@ cd html-studio
 python3 extension/install.py     # 注册 native host，让页面有权限写回磁盘
 ```
 
-然后 `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选 `extension/` 目录。
+然后在浏览器里做三步：
 
-打开任意本地 `.html`，右上角出现 ✎，点它开始编辑。
+1. `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选 `extension/` 目录
+2. 扩展卡片 →「详情」→ 打开 **「允许访问文件网址」**
+   ← 不开这个，本地页面不会有任何反应，也不会报错
+3. 完全退出浏览器再重开（native host 注册在启动时读取）
+
+打开任意本地 `.html`，右下角出现 ✎，点它开始编辑。
 
 ### 方式二：本地网页版（不装扩展）
 
@@ -108,7 +113,7 @@ macOS 完整支持。Linux 逻辑相同但未实机验证。Windows 的扩展部
 ## 开发者
 
 ```bash
-python3 tests/e2e_chrome.py      # 真 Chrome + 真 native messaging，端到端 15 项断言
+python3 tests/e2e_chrome.py      # 真 Chrome + 真 native messaging，端到端 17 项断言
 ```
 
 一条链路：`content.js`（注入编辑条，shadow DOM 隔离样式）→ `background.js`（转发消息，content script 不能直接调 `sendNativeMessage`）→ `native_host.py`（校验 + 读写文件）。改完扩展代码记得回 `chrome://extensions` 点「重新加载」。
