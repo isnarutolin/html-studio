@@ -4,7 +4,7 @@
 
 Click the text on the page and edit it. Saving writes back to the same `.html` file — not a copy, not an export. You see a diff before it lands, and every change is backed up.
 
-English | [简体中文](README.md)
+English | [简体中文](README.md) · [FAQ](docs/FAQ.md) · [Changelog](CHANGELOG.md)
 
 ![Editing text directly on the page, saving back to the original file](docs/images/hero.gif)
 
@@ -49,6 +49,8 @@ Then in the browser:
 3. Fully quit and reopen the browser (the native host registration is read at startup)
 
 Open any local `.html`; a ✎ appears in the bottom-right corner. Click it to start editing.
+
+Stuck on a step? Click the extension's **toolbar icon** (🧩 → HTML Studio) — the self-check page verifies "extension loaded / file-URL access / native host connectivity" live and tells you exactly what to fix. Command-line equivalent: `python3 extension/install.py --check`.
 
 ### Option 2: Local web app (no extension)
 

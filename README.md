@@ -4,7 +4,7 @@
 
 所有html网页，你只需要在页面下方找到编辑入口，点一下就改，保存写回原来的 `.html` 文件——不是另存一份，不是导出 PDF。保存前能看 diff，每一笔改动都有备份。
 
-[English](README.en.md) | 简体中文
+[English](README.en.md) | 简体中文 · [常见问题](docs/FAQ.md) · [更新记录](CHANGELOG.md)
 
 ![在页面上直接改字，保存写回原文件](docs/images/hero.gif)
 
@@ -49,6 +49,8 @@ python3 extension/install.py     # 注册 native host，让页面有权限写回
 3. 完全退出浏览器再重开（native host 注册在启动时读取）
 
 打开任意本地 `.html`，右下角出现 ✎，点它开始编辑。
+
+卡在哪一步？点浏览器工具栏的**扩展图标**（🧩 → HTML Studio）→ 自检页会实时检查「扩展已加载 / 文件访问权限 / 本地程序连通性」，哪项红了直接告诉你怎么办。命令行等价：`python3 extension/install.py --check`。
 
 ### 方式二：本地网页版（不装扩展）
 
