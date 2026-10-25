@@ -6,8 +6,8 @@
 
 [English](README.en.md) | 简体中文
 
-<!-- TODO: 换成你的真实录屏，2-4 秒的 GIF 比静态图强十倍 -->
-![在页面上直接改字，保存写回原文件](docs/images/hero.gif)
+![Uploading 20261025222234.gif…]()
+
 
 ---
 
