@@ -179,7 +179,10 @@ def main():
                 '<title>e2e</title></head>\n'
                 '<body><h1>原标题</h1><p>一段要改的文字</p>\n'
                 '<svg viewBox="0 0 28 12"><line x1="2" y1="6" x2="22" y2="6" '
-                'stroke="#1976d2"/></svg>\n</body></html>\n')
+                'stroke="#1976d2"/></svg>\n'
+                '<script>window.__clicks=0;'
+                'document.addEventListener("click",function(){window.__clicks++});'
+                '</script>\n</body></html>\n')
 
     proc = subprocess.Popen(
         [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--no-first-run",
@@ -232,6 +235,8 @@ def main():
 
         cdp.ev(f"{SH}.shadowRoot.querySelector('.fab').click()", sess)
         ok("点 ✎ 进入编辑", wait("document.body.getAttribute('contenteditable')==='true'"))
+        ok("点 ✎ 不触发页面的点击监听",
+           cdp.ev("window.__clicks", sess) == 0, cdp.ev("window.__clicks", sess))
         ok("工具条出现", cdp.ev(f"!!{SH}.shadowRoot.querySelector('.bar')", sess) is True)
 
         tag = cdp.ev("""(()=>{const el=document.querySelector('h1');if(!el)return null;
@@ -240,6 +245,7 @@ def main():
         ok("改文字", tag == "H1", tag)
         ok("出现未保存橙点", wait(f"!!{SH}.shadowRoot.querySelector('.dot.show')", 6))
 
+        clicks_before = cdp.ev("window.__clicks", sess)
         cdp.ev(f"{SH}.shadowRoot.querySelector('[data-a=\"save\"]').click()", sess)
         saved = False
         for _ in range(25):
@@ -248,6 +254,9 @@ def main():
                 saved = True
                 break
         ok("经 native messaging 真实落盘", saved, f"{os.path.getsize(page)} bytes")
+        ok("点保存不触发页面的点击监听（不会翻页/跳转）",
+           cdp.ev("window.__clicks", sess) == clicks_before,
+           f"{clicks_before} → {cdp.ev('window.__clicks', sess)}")
 
         disk = open(page, encoding="utf-8").read()
         ok("落盘无编辑器残留",

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HTML Studio — 直接编辑本地 HTML",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "在任意本地 HTML 页面上直接改文字，Cmd+S 存回原文件（自动备份、可撤销）。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz84vYb44FDTs3LD5oETRkqBO4PxOf2A/aYLqSCCtEM8/jEhw+0X8Mwq+EIlRqKEEPwwSfvsJCMA9HjFVy/6/6Pa69O9mn/td3Nm/0L9/qRx7tJncsMyj1YpBduwJJh/MZHHgdAbwZtDFk0GmtTZoPXrJtD4BzILhlKPkbsZxZkR0ifPuOlyN6oFVNHF0gpP8ZJz04WRxHa6lAsIq2G9QutC8roGietmfFqFY3RBM6uOaXxiowBcqF3WTDJvGRAr7rniY1TkdhahoS8sY1XJv6Wxc78r6xD4F7dmBBuflbhTlnkpU60NwyKa8ODMszGH42p2vHM9f/Qs4Z7dKpfwK0wIDAQAB",
   "permissions": [

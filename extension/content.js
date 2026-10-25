@@ -276,6 +276,28 @@
     if (a) e.preventDefault();
   }, true);
 
+  // 编辑模式下，不让点击事件传到页面自己的监听器。
+  // 很多 AI 生成的页面是「点一下翻下一页」的结构（document 上挂着 click），
+  // 不拦住的话点工具条（尤其保存）会被当成翻页指令。
+  // 只 stopPropagation 不 preventDefault —— 光标定位、选择文本等原生编辑行为必须保留。
+  ['click', 'mousedown', 'mouseup', 'dblclick', 'pointerdown', 'pointerup',
+   'touchstart', 'touchend', 'contextmenu'].forEach((type) => {
+    document.addEventListener(type, (e) => {
+      if (!S.active) return;
+      // 工具条自己的事件要放行（否则连保存按钮都点不动），
+      // 它们由 buildUI 里 host 层的 stopPropagation 拦住，不会传给页面
+      let fromUI = false;
+      try {
+        const path = e.composedPath ? e.composedPath() : [];
+        fromUI = path.includes(S.host) || e.target === S.host;
+      } catch (_) {
+        fromUI = e.target === S.host;
+      }
+      if (fromUI) return;
+      e.stopPropagation();
+    }, true);
+  });
+
   document.addEventListener('submit', (e) => { if (S.active) e.preventDefault(); }, true);
   document.addEventListener('input', () => { if (S.active) markDirty(); }, true);
 
@@ -382,6 +404,12 @@
     shadow.appendChild(style);
     S.shadow = shadow;
     S.host = host;
+    // 双保险：即使上面的 document 层拦截失效（比如页面用捕获阶段监听），
+    // 也不让工具条内的事件冒泡出去
+    ['click', 'mousedown', 'mouseup', 'dblclick', 'pointerdown', 'pointerup',
+     'touchstart', 'touchend', 'contextmenu', 'wheel'].forEach((type) => {
+      host.addEventListener(type, (e) => e.stopPropagation(), false);
+    });
     (document.documentElement || document.body).appendChild(host);
     render();
   }
@@ -393,6 +421,7 @@
 
     if (!S.active) {
       const fab = el('button', 'fab', '✎');
+      fab.type = 'button';
       fab.title = 'HTML Studio：编辑这个页面';
       fab.onclick = () => activate();
       shadow.appendChild(fab);
@@ -406,6 +435,7 @@
 
     const add = (label, title, fn, cls) => {
       const b = el('button', cls || '', label);
+      b.type = 'button'; // 防止页面里残留未闭合的 <form> 把按钮当成提交按钮
       if (title) b.title = title;
       b.onmousedown = (e) => e.preventDefault(); // 保住选区
       b.onclick = fn;
