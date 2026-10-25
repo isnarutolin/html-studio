@@ -194,7 +194,8 @@
       await call({ op: 'undo-last', path: filePath });
       location.reload();
     } catch (e) {
-      toast('撤销失败：' + e.message, true);
+      toast('撤销失败：' + e.message +
+        '\n如果只是想丢掉这次没保存成功的修改，用工具条上的「放弃改动」或 Cmd+Z。', true);
     }
   }
 
@@ -300,8 +301,17 @@
 
   document.addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); if (S.active) doSave(); }
-    if (mod && e.key.toLowerCase() === 'e' && S.active) { e.preventDefault(); toggle(); }
+    const k = e.key.toLowerCase();
+    if (mod && k === 's') { e.preventDefault(); if (S.active) doSave(); return; }
+    if (mod && k === 'e' && S.active) { e.preventDefault(); toggle(); return; }
+    // 自己在捕获阶段接管撤销/重做：交给 execCommand（和工具条 ↶↷ 同一个通道，
+    // 已在真实浏览器里验证有效），不依赖页面的 keydown 处理器和浏览器默认行为。
+    if (mod && k === 'z' && S.active) {
+      e.preventDefault();
+      document.execCommand(e.shiftKey ? 'redo' : 'undo', false, null);
+      markDirty();
+      return;
+    }
     if (e.key === 'Escape') { if (S.popup) closePopup(); else if (S.active) deactivate(); }
   }, true);
 
@@ -435,6 +445,10 @@
       const def = filePath.replace(/\.html?$/i, '-copy.html');
       const v = prompt('另存为（绝对路径）', def);
       if (v && v.trim()) doSave(v.trim());
+    });
+    // 不依赖本地程序：即使保存链路坏了，也能一键回到磁盘上的内容
+    add('放弃改动', '丢弃未保存的修改，重新从文件加载', () => {
+      if (!S.dirty || confirm('放弃未保存的修改，恢复到文件里的内容？')) location.reload();
     });
     const bkBtn = add('备份', '备份历史 / 恢复', openBackups);
     bkBtn.dataset.a = 'backups';
