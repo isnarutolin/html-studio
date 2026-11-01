@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "HTML Studio — 直接编辑本地 HTML",
-  "version": "1.0.3",
-  "description": "在任意本地 HTML 页面上直接改文字，Cmd+S 存回原文件（自动备份、可撤销）。",
+  "name": "HTML Studio — 直接编辑本地 / 网页 HTML",
+  "version": "1.1.0",
+  "description": "在任意 html 页面（本地文件或网页）上直接改文字、字体字号、拖动模块、删除某一页，Cmd+S 保存成本地文件（自动备份、可撤销）。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz84vYb44FDTs3LD5oETRkqBO4PxOf2A/aYLqSCCtEM8/jEhw+0X8Mwq+EIlRqKEEPwwSfvsJCMA9HjFVy/6/6Pa69O9mn/td3Nm/0L9/qRx7tJncsMyj1YpBduwJJh/MZHHgdAbwZtDFk0GmtTZoPXrJtD4BzILhlKPkbsZxZkR0ifPuOlyN6oFVNHF0gpP8ZJz04WRxHa6lAsIq2G9QutC8roGietmfFqFY3RBM6uOaXxiowBcqF3WTDJvGRAr7rniY1TkdhahoS8sY1XJv6Wxc78r6xD4F7dmBBuflbhTlnkpU60NwyKa8ODMszGH42p2vHM9f/Qs4Z7dKpfwK0wIDAQAB",
   "permissions": [
-    "nativeMessaging"
+    "nativeMessaging",
+    "contextMenus"
   ],
   "background": {
     "service_worker": "background.js"
@@ -22,9 +23,14 @@
   "content_scripts": [
     {
       "matches": [
-        "file:///*"
+        "file:///*",
+        "http://*/*",
+        "https://*/*"
       ],
       "js": [
+        "lib/format.js",
+        "lib/move.js",
+        "lib/pages.js",
         "content.js"
       ],
       "run_at": "document_idle",
@@ -36,5 +42,14 @@
     "32": "icon-32.png",
     "48": "icon-48.png",
     "128": "icon-128.png"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "在当前页面开启/关闭 HTML Studio 编辑"
+    }
   }
 }

@@ -16,17 +16,21 @@
 """
 
 import base64
+import functools
 import glob
 import json
 import os
+import re
 import shutil
 import socket
 import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -126,6 +130,15 @@ class CDP:
                 return r
         return {"error": "timeout"}
 
+    def fire(self, method, params=None, session=None):
+        """只发不等回复 —— 用于会弹出 confirm/prompt、把 JS 卡住的表达式。"""
+        self._id += 1
+        msg = {"id": self._id, "method": method, "params": params or {}}
+        if session:
+            msg["sessionId"] = session
+        self.ws.send(msg)
+        return self._id
+
     def ev(self, expr, session=None, timeout=30):
         r = self.call("Runtime.evaluate",
                       {"expression": expr, "awaitPromise": True, "returnByValue": True},
@@ -143,6 +156,19 @@ def find_chrome():
         if os.path.isfile(p) and os.access(p, os.X_OK):
             return p
     sys.exit("找不到 Chrome / Chromium，可编辑 CHROME_CANDIDATES 指定路径")
+
+
+def accept_dialog(cdp, session=None, prompt_text=None, tries=25):
+    """把弹出来的 confirm/prompt 点掉（confirm → 确定；prompt → 填 prompt_text）。"""
+    for _ in range(tries):
+        params = {"accept": True}
+        if prompt_text is not None:
+            params["promptText"] = prompt_text
+        r = cdp.call("Page.handleJavaScriptDialog", params, session, timeout=6)
+        if not r.get("error"):
+            return True
+        time.sleep(0.2)
+    return False
 
 
 def real_host_manifests():
@@ -178,11 +204,43 @@ def main():
         f.write('<!DOCTYPE html>\n<html lang="zh-CN"><head><meta charset="utf-8">'
                 '<title>e2e</title></head>\n'
                 '<body><h1>原标题</h1><p>一段要改的文字</p>\n'
+                '<div id="deck">'
+                '<section class="slide" style="height:110px"><h2 style="width:40%;margin:0">第一页</h2></section>'
+                '<section class="slide" style="height:110px"><h2 style="width:40%;margin:0">第二页</h2></section>'
+                '<section class="slide" style="height:110px"><h2 style="width:40%;margin:0">第三页</h2></section>'
+                '</div>\n'
                 '<svg viewBox="0 0 28 12"><line x1="2" y1="6" x2="22" y2="6" '
                 'stroke="#1976d2"/></svg>\n'
                 '<script>window.__clicks=0;'
                 'document.addEventListener("click",function(){window.__clicks++});'
                 '</script>\n</body></html>\n')
+
+    # 本地起一个 http 站点：模拟「别人把一个 html 分享给我」的场景
+    site_dir = os.path.join(work, "site")
+    os.makedirs(site_dir, exist_ok=True)
+    with open(os.path.join(site_dir, "remote.html"), "w", encoding="utf-8") as f:
+        f.write('<!DOCTYPE html>\n<html lang="zh-CN"><head><meta charset="utf-8">'
+                '<title>远程</title>'
+                '<link rel="stylesheet" href="style.css">'
+                '</head>\n<body><h1>远程标题</h1>'
+                '<p><img src="pic.svg" alt=""></p>\n</body></html>\n')
+    with open(os.path.join(site_dir, "style.css"), "w", encoding="utf-8") as f:
+        f.write('body{font-family:sans-serif}\n')
+    with open(os.path.join(site_dir, "pic.svg"), "w", encoding="utf-8") as f:
+        f.write('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
+                '<rect width="10" height="10" fill="#1976d2"/></svg>\n')
+
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=site_dir)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    web_port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    web_url = f"http://127.0.0.1:{web_port}/remote.html"
+    downloads = os.path.join(os.path.expanduser("~"), "Downloads")
+    os.makedirs(downloads, exist_ok=True)
+    remote_local = os.path.join(downloads, f"127.0.0.1-remote.html")
+    for stale in (remote_local,):
+        if os.path.exists(stale):
+            os.remove(stale)
 
     proc = subprocess.Popen(
         [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--no-first-run",
@@ -221,10 +279,10 @@ def main():
 
         SH = "document.getElementById('__html_studio_host__')"
 
-        def wait(expr, sec=12):
+        def wait(expr, sec=12, session=None):
             end = time.time() + sec
             while time.time() < end:
-                if cdp.ev(expr, sess) is True:
+                if cdp.ev(expr, session or sess) is True:
                     return True
                 time.sleep(0.35)
             return False
@@ -271,6 +329,208 @@ def main():
         ok("备份已生成", os.path.isdir(bak) and bool(os.listdir(bak)),
            os.listdir(bak)[0] if os.path.isdir(bak) and os.listdir(bak) else bak)
 
+        # ---------------- 字体 / 字号 ----------------
+        cdp.ev("""(()=>{const h=document.querySelector('h1');const r=document.createRange();
+            r.selectNodeContents(h);const s=getSelection();s.removeAllRanges();s.addRange(r);
+            return true;})()""", sess)
+        cdp.ev(f"""(()=>{{const b=[...{SH}.shadowRoot.querySelectorAll('.bar button')]
+            .find(x=>x.textContent==='Aa');b.click();return !!b;}})()""", sess)
+        ok("Aa 面板打开",
+           cdp.ev(f"!!{SH}.shadowRoot.querySelector('.pop[data-pop=\"font\"]')", sess) is True)
+
+        cdp.ev(f"""(()=>{{const sels={SH}.shadowRoot.querySelectorAll('.pop[data-pop="font"] select');
+            sels[1].value='32';sels[1].dispatchEvent(new Event('change'));return true;}})()""", sess)
+        fs = cdp.ev("""(()=>{const s=document.querySelector('h1 span[style*="font-size"]');
+            return s?getComputedStyle(s).fontSize:null})()""", sess)
+        ok("字号应用到选中文字", fs == "32px", fs)
+
+        cdp.ev(f"""(()=>{{const f={SH}.shadowRoot
+            .querySelectorAll('.pop[data-pop="font"] select')[0];
+            f.value='Georgia, "Songti SC", serif';f.dispatchEvent(new Event('change'));
+            return true;}})()""", sess)
+        ff = cdp.ev("""(()=>{const s=document.querySelector('h1 span[style*="font-family"]');
+            return s?s.getAttribute('style'):null})()""", sess)
+        ok("字体应用到选中文字", "Georgia" in (ff or ""), ff)
+        ok("改字体不会弄丢之前的字号", "32px" in (ff or ""), ff)
+        ok("字体字号不改动其他标签结构",
+           cdp.ev("document.querySelectorAll('h1').length", sess) == 1,
+           cdp.ev("document.querySelectorAll('h1').length", sess))
+        cdp.ev(f"{SH}.shadowRoot.querySelectorAll('.pop').forEach(n=>n.remove())", sess)
+        # 局部选区：只包住选中的那几个字，其余不动
+        cdp.ev("""(()=>{const p=document.querySelector('p');const t=p.firstChild;
+            const r=document.createRange();r.setStart(t,0);r.setEnd(t,2);
+            const s=getSelection();s.removeAllRanges();s.addRange(r);return true})()""", sess)
+        cdp.ev(f"""(()=>{{[...{SH}.shadowRoot.querySelectorAll('.bar button')]
+            .find(x=>x.textContent==='Aa').click();return true}})()""", sess)
+        cdp.ev(f"""(()=>{{const sels={SH}.shadowRoot.querySelectorAll('.pop[data-pop="font"] select');
+            sels[1].value='40';sels[1].dispatchEvent(new Event('change'));return true}})()""", sess)
+        part = cdp.ev("""(()=>{const p=document.querySelector('p');
+            return {html:p.innerHTML, text:p.textContent}})()""", sess)
+        ok("局部选区只包住选中的字",
+           isinstance(part, dict) and part.get("text") == "一段要改的文字"
+           and "font-size:40px" in (part.get("html") or "").replace(" ", "")
+           and (part.get("html") or "").count("<span") == 1, part)
+        cdp.ev(f"{SH}.shadowRoot.querySelectorAll('.pop').forEach(n=>n.remove())", sess)
+
+        # ---------------- 拖动模块 ----------------
+        cdp.ev(f"""(()=>{{[...{SH}.shadowRoot.querySelectorAll('.bar button')]
+            .find(x=>x.textContent==='移动').click();return true}})()""", sess)
+        ok("进入移动模式",
+           cdp.ev("document.documentElement.classList.contains('hs-move-mode')", sess) is True)
+        ok("移动模式下关掉文字编辑",
+           cdp.ev("document.body.getAttribute('contenteditable')", sess) == "false")
+
+        coords = cdp.ev("""(()=>{const s=[...document.querySelectorAll('#deck > .slide')];
+            const a=s[1].getBoundingClientRect(), b=s[0].getBoundingClientRect();
+            return {x1:Math.round(a.left+a.width*0.8),y1:Math.round(a.top+10),
+                    x2:Math.round(b.left+b.width*0.8),y2:Math.round(b.top+10)};})()""", sess)
+        cdp.ev(f"""(()=>{{const c={json.dumps(coords)};
+          const common={{bubbles:true,cancelable:true,composed:true,pointerId:1,
+                        pointerType:'mouse',isPrimary:true}};
+          const hit=(x,y)=>document.elementFromPoint(x,y);
+          const fire=(ty,x,y,buttons)=>hit(x,y).dispatchEvent(
+            new PointerEvent(ty,Object.assign({{clientX:x,clientY:y,buttons:buttons}},common)));
+          fire('pointerdown',c.x1,c.y1,1);
+          fire('pointermove',c.x1,c.y1-6,1);
+          fire('pointermove',c.x2,c.y2,1);
+          fire('pointerup',c.x2,c.y2,0);
+          return true}})()""", sess)
+        order = cdp.ev("[...document.querySelectorAll('#deck > .slide h2')]"
+                       ".map(x=>x.textContent)", sess)
+        ok("拖动后顺序变化", bool(order) and order[0] == "第二页", order)
+
+        # Cmd+Z 撤销拖动（脚本改的 DOM，浏览器自带撤销追不到，扩展自己记了一份）
+        cdp.ev("""(()=>{document.dispatchEvent(new KeyboardEvent('keydown',
+            {key:'z',metaKey:true,bubbles:true,cancelable:true}));return true})()""", sess)
+        undone = cdp.ev("[...document.querySelectorAll('#deck > .slide h2')]"
+                        ".map(x=>x.textContent)", sess)
+        ok("Cmd+Z 撤销拖动", undone == ["第一页", "第二页", "第三页"], undone)
+
+        # 再拖一次，供后面的删页用例使用
+        cdp.ev(f"""(()=>{{const c={json.dumps(coords)};
+          const common={{bubbles:true,cancelable:true,composed:true,pointerId:1,
+                        pointerType:'mouse',isPrimary:true}};
+          const hit=(x,y)=>document.elementFromPoint(x,y);
+          const fire=(ty,x,y,buttons)=>hit(x,y).dispatchEvent(
+            new PointerEvent(ty,Object.assign({{clientX:x,clientY:y,buttons:buttons}},common)));
+          fire('pointerdown',c.x1,c.y1,1);
+          fire('pointermove',c.x1,c.y1-6,1);
+          fire('pointermove',c.x2,c.y2,1);
+          fire('pointerup',c.x2,c.y2,0);
+          return true}})()""", sess)
+        ok("拖动的元素数量不变",
+           cdp.ev("document.querySelectorAll('#deck > .slide').length", sess) == 3,
+           cdp.ev("document.querySelectorAll('#deck > .slide').length", sess))
+        ok("拖动不留幽灵节点",
+           cdp.ev("document.querySelectorAll('[data-hs-drag]').length", sess) == 0)
+        cdp.ev(f"""(()=>{{[...{SH}.shadowRoot.querySelectorAll('.bar button')]
+            .find(x=>x.textContent==='移动').click();return true}})()""", sess)
+        ok("退出移动模式",
+           cdp.ev("!document.documentElement.classList.contains('hs-move-mode')", sess) is True)
+
+        # ---------------- 删除某一页 ----------------
+        cdp.ev(f"""(()=>{{[...{SH}.shadowRoot.querySelectorAll('.bar button')]
+            .find(x=>x.textContent==='页面').click();return true}})()""", sess)
+        rows = cdp.ev(f"{SH}.shadowRoot.querySelectorAll('.pop[data-pop=\"pages\"] .pop-row').length",
+                      sess)
+        ok("识别出 3 页", rows == 3, rows)
+
+        cdp.call("Page.enable", session=sess)
+        cdp.fire("Runtime.evaluate", {
+            "expression": f"""(()=>{{const w={SH}.shadowRoot.querySelector('.pop[data-pop="pages"]');
+                w.querySelector('.pop-row button').click();return true}})()""",
+            "returnByValue": True,
+        }, sess)
+        ok("删除时 confirm 弹窗", accept_dialog(cdp, sess))
+        time.sleep(0.8)
+        left = cdp.ev("document.querySelectorAll('#deck > .slide').length", sess)
+        ok("删掉一页（剩 2 页）", left == 2, left)
+        ok("删的是第 1 页",
+           cdp.ev("[...document.querySelectorAll('#deck > .slide h2')].map(x=>x.textContent).join(',')",
+                  sess) == "第一页,第三页",
+           cdp.ev("[...document.querySelectorAll('#deck > .slide h2')].map(x=>x.textContent).join(',')",
+                  sess))
+        cdp.ev(f"{SH}.shadowRoot.querySelectorAll('.pop').forEach(n=>n.remove())", sess)
+
+        # ---------------- 本地文件：另存为副本 ----------------
+        copy_path = os.path.join(work, "copy.html")
+        cdp.call("Page.enable", session=sess)
+        cdp.ev(f"""(()=>{{[...{SH}.shadowRoot.querySelectorAll('.bar button')]
+            .find(x=>x.textContent==='⋯').click();return true}})()""", sess)
+        cdp.fire("Runtime.evaluate", {
+            "expression": f"""(()=>{{const w={SH}.shadowRoot.querySelector('.pop[data-pop="more"]');
+                [...w.querySelectorAll('button')].find(b=>b.textContent.startsWith('另存为')).click();
+                return true}})()""",
+            "returnByValue": True,
+        }, sess)
+        ok("另存为弹出路径输入", accept_dialog(cdp, sess, prompt_text=copy_path))
+        copied = False
+        for _ in range(25):
+            time.sleep(0.3)
+            if os.path.exists(copy_path):
+                copied = True
+                break
+        ok("另存为生成了副本", copied, copy_path)
+        copy_txt = open(copy_path, encoding="utf-8").read() if copied else ""
+        flat = copy_txt.replace(" ", "")
+        ok("副本带着改动一起走",
+           "font-size:32px" in flat and "font-family:Georgia" in flat,
+           re.search(r"<h1>.{0,80}", copy_txt).group(0) if re.search(r"<h1>.{0,80}", copy_txt) else "")
+        ok("副本无编辑器残留",
+           "__html_studio_host__" not in copy_txt and "contenteditable" not in copy_txt.lower())
+
+        copy_mtime = os.path.getmtime(copy_path) if copied else 0
+        time.sleep(0.1)
+        cdp.fire("Runtime.evaluate", {
+            "expression": f"""(()=>{{const w={SH}.shadowRoot.querySelector('.pop[data-pop="more"]');
+                [...w.querySelectorAll('button')].find(b=>b.textContent.startsWith('另存为')).click();
+                return true}})()""",
+            "returnByValue": True,
+        }, sess)
+        accept_dialog(cdp, sess, prompt_text=copy_path)
+        time.sleep(1.0)
+        ok("另存为不覆盖已存在的文件",
+           os.path.exists(copy_path) and os.path.getmtime(copy_path) == copy_mtime,
+           f"{copy_mtime} → {os.path.getmtime(copy_path) if os.path.exists(copy_path) else 'gone'}")
+        cdp.ev(f"{SH}.shadowRoot.querySelectorAll('.pop').forEach(n=>n.remove())", sess)
+
+        # ---------------- 网页（http）→ 保存成本地文件 ----------------
+        tr = cdp.call("Target.createTarget", {"url": web_url})
+        sr = cdp.call("Target.attachToTarget",
+                      {"targetId": tr["result"]["targetId"], "flatten": True})["result"]["sessionId"]
+        cdp.call("Runtime.enable", session=sr)
+        ok("网页上自动出现 ✎",
+           wait(f"!!{SH}.shadowRoot.querySelector('.fab')", 20, sr))
+
+        cdp.ev(f"{SH}.shadowRoot.querySelector('.fab').click()", sr)
+        ok("网页上进入编辑", wait("document.body.getAttribute('contenteditable')==='true'", 10))
+        t_before = cdp.ev(f"({SH}.shadowRoot.querySelector('.toast')||{{}}).textContent||''", sr)
+        ok("提示首次保存在 Downloads", "Downloads" in (t_before or ""), t_before)
+        cdp.ev("""(()=>{const el=document.querySelector('h1');
+            el.textContent='★REMOTE★ 改过的网页标题';
+            el.dispatchEvent(new Event('input',{bubbles:true}));return true})()""", sr)
+
+        cdp.ev(f"{SH}.shadowRoot.querySelector('[data-a=\"save\"]').click()", sr)
+        remote_saved = False
+        for _ in range(30):
+            time.sleep(0.4)
+            if os.path.exists(remote_local) and "★REMOTE★" in open(remote_local, encoding="utf-8").read():
+                remote_saved = True
+                break
+        ok("网页改动落成了本地 html", remote_saved, remote_local)
+
+        if remote_saved:
+            rtxt = open(remote_local, encoding="utf-8").read()
+            ok("相对 CSS 转成绝对地址", f"http://127.0.0.1:{web_port}/style.css" in rtxt,
+               [l for l in rtxt.splitlines() if "style.css" in l][:1])
+            ok("相对图片转成绝对地址", f"http://127.0.0.1:{web_port}/pic.svg" in rtxt,
+               [l for l in rtxt.splitlines() if "pic.svg" in l][:1])
+            ok("网页落盘同样无编辑器残留",
+               "__html_studio_host__" not in rtxt and "contenteditable" not in rtxt.lower()
+               and "hs-move-mode" not in rtxt)
+            r_toast = cdp.ev(f"({SH}.shadowRoot.querySelector('.toast')||{{}}).textContent||''", sr)
+            ok("网页保存提示包含落盘路径", remote_local.split("/")[-1] in (r_toast or ""), r_toast)
+
         # 自检页
         t2 = cdp.call("Target.createTarget", {"url": f"chrome-extension://{ext_id}/help.html"})
         s2 = cdp.call("Target.attachToTarget",
@@ -290,6 +550,14 @@ def main():
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(os.path.join(STATE_DIR, "backups",
                                    os.path.relpath(work, os.path.expanduser("~"))), ignore_errors=True)
+        httpd.shutdown()
+        for p in (remote_local,):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+        shutil.rmtree(os.path.join(STATE_DIR, "backups", "Downloads", "127.0.0.1-remote.html.bak"),
+                      ignore_errors=True)
 
     print("\n".join(PASS))
     print("\n".join(FAIL))

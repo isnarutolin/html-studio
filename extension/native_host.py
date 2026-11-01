@@ -20,7 +20,7 @@ import re
 import sys
 import traceback
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 HOME = os.path.realpath(os.path.expanduser("~"))
 STATE_DIR = os.path.join(HOME, ".html-studio")
 BACKUP_ROOT = os.path.join(STATE_DIR, "backups")
@@ -265,6 +265,8 @@ OPS = {
     "info": op_info,
     "save": lambda r: op_save(r, must_exist=True),
     "save-as": lambda r: op_save(r, must_exist=False),
+    # 网页（http/https）第一次保存：目标文件还不存在，存在则覆盖（覆盖前照旧备份）
+    "save-or-create": lambda r: op_save(r, must_exist=None),
     "backups": op_backups,
     "restore": op_restore,
     "undo-last": op_undo_last,
