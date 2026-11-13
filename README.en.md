@@ -4,6 +4,8 @@
 
 Local `.html` files and **pages someone shared with you as a link** are both editable in place: retype text, switch font and size, drag blocks around, delete a whole page — then `Cmd/Ctrl + S` writes a local `.html` file. You see a diff before it lands, and every change is backed up.
 
+**It also annotates.** Select text, leave a comment, reply, mark it resolved — annotations travel with the file (export a standalone HTML or JSON). Want several people to see each other's comments live on the same page? Start the bundled local collab server.
+
 English | [简体中文](README.md) · [FAQ](docs/FAQ.md) · [Changelog](CHANGELOG.md)
 
 ![Editing text directly on the page, saving back to the original file](docs/images/hero.gif)
@@ -27,6 +29,7 @@ You asked AI for a weekly report, a dashboard, a proposal page. It came out good
 | **Drag blocks** | Click `移动` → drag a heading, image, card or whole section; the blue line shows where it lands; hold `Shift` to grab the parent container |
 | **Delete a page** | Click `页面` → every detected page is listed → jump to it or delete it |
 | **Edit a shared web page** | Open the link (no source file needed) → the first `Cmd+S` saves it as `~/Downloads/<host>-<page>.html`; later saves write to that file |
+| **Annotate** | Click 💬 to enter annotation mode → select text → write a comment; the sidebar supports replies, resolving, and exporting standalone HTML / JSON |
 
 Saving a web page rewrites relative URLs (`./style.css`, `/img/a.png`) into absolute ones, so styles and images still load offline.
 
@@ -86,6 +89,53 @@ python3 service.py status       # check status
 python3 service.py logs         # follow logs
 python3 service.py uninstall    # remove
 ```
+
+## Annotation: leave comments on the page
+
+Editing is "I changed it"; annotating is "I think this needs changing". Annotations never touch the document — they add a highlight layer plus a comment sidebar.
+
+### Solo (default, no server needed)
+
+Click 💬 in the bottom-right corner (or `Cmd/Ctrl + Shift + A`) → select text → click the floating "批注" button → write. The sidebar supports replies and resolving. Turning annotation mode off hides the highlights; the document itself is untouched byte for byte.
+
+Annotations live in the browser's `localStorage` by default. Three buttons in the sidebar header take them elsewhere:
+
+| Button | What it does |
+| --- | --- |
+| ⬇ | Export annotations as JSON (share or archive) |
+| ⬆ | Import someone's JSON (merged by id, never overwrites what you added) |
+| ⤓ | Export a standalone HTML with the annotations baked in — the recipient just double-clicks it |
+
+> Annotation and editing are mutually exclusive: annotation relies on text selection, editing relies on `contenteditable`, and they fight over the selection. Entering one exits the other.
+
+### Shared (run the local server)
+
+To have everyone see each other's comments live on the same page, run `collab.py` — **zero third-party dependencies**, standard library only:
+
+```bash
+python3 collab.py --dir ~/Desktop/reports                       # default port 8899
+python3 collab.py --dir ~/Desktop/reports --passcode <secret>    # require a passcode
+```
+
+It does three things:
+
+1. Serves the HTML in `--dir` and injects the annotation engine before `</body>` — drop a page in, open it, annotations are there
+2. Provides `/api/state`, `/api/stream` (SSE push) and `/api/op` — a comment shows up for everyone else without a refresh
+3. **Only the author can resolve or delete their own annotations** — buttons are disabled in the UI *and* enforced server-side, so a forged request still gets a 403
+
+The terminal prints two URLs: `http://localhost:8899/` for you, plus a LAN address for colleagues. For people outside your network, put a tunnel in front:
+
+```bash
+bore local 8899 --to bore.pub      # gives you an http://bore.pub:<port> public URL
+```
+
+Data lands in `data/<docId>.json` — one file per document, easy to back up or commit.
+
+Honest security boundaries:
+
+- **Without a passcode, anyone with the link can read and annotate.** Add `--passcode` to lock it down.
+- Identity is "browser cookie + first-come-first-served display name". It stops accidental deletion of someone else's comment; it is **not** real authentication.
+- The server runs on your machine — if it sleeps or shuts down, the link stops working.
 
 ## See the diff before you save
 

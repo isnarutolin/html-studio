@@ -70,6 +70,8 @@
     active: false,
     dirty: false,
     move: false,
+    // 批注模式（与编辑模式互斥：编辑会给 body 加 contenteditable，两者抢选区）
+    anno: false,
     // 网页上默认不挂 ✎，激活过一次之后才一直挂着（方便再次打开）
     wasActivated: false,
     target: IS_FILE ? sourcePath : readSavedTarget(),
@@ -135,6 +137,7 @@
   /* ---------------- 编辑状态 ---------------- */
   function activate() {
     if (!document.body || S.active) return;
+    if (S.anno) exitAnno();      // 编辑与批注互斥：先退批注
     S.active = true;
     S.wasActivated = true;
     document.body.setAttribute('contenteditable', 'true');
@@ -168,6 +171,41 @@
   }
 
   function toggle() { S.active ? deactivate() : activate(); }
+
+  /* ---------------- 批注模式 ---------------- */
+  function ensureAnnotator() {
+    if (window.HtmlAnnotator && window.HtmlAnnotator.isInited()) return true;
+    if (!window.HtmlAnnotator) {
+      toast('批注引擎未加载', true);
+      return false;
+    }
+    try {
+      window.HtmlAnnotator.init({ contentSelector: 'body' });
+    } catch (e) {
+      toast('批注初始化失败：' + (e && e.message ? e.message : e), true);
+      return false;
+    }
+    return true;
+  }
+
+  function enterAnno() {
+    if (!document.body) return;
+    if (S.active) deactivate();   // 退出编辑，避免 contenteditable 抢选区
+    if (!ensureAnnotator()) return;
+    S.anno = true;
+    window.HtmlAnnotator.setActive(true);
+    render();
+    toast('批注模式：划选文字 → 点「批注」；再次点 💬 退出');
+  }
+
+  function exitAnno() {
+    if (!S.anno) return;
+    S.anno = false;
+    if (window.HtmlAnnotator) window.HtmlAnnotator.setActive(false);
+    render();
+  }
+
+  function toggleAnno() { S.anno ? exitAnno() : enterAnno(); }
 
   function injectPageStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -537,6 +575,8 @@
     if (mod && k === 's') { e.preventDefault(); if (S.active) doSave(); return; }
     if (mod && k === 'e' && S.active) { e.preventDefault(); toggle(); return; }
     if (mod && k === 'm' && S.active) { e.preventDefault(); setMoveMode(!S.move); return; }
+    // Cmd/Ctrl+Shift+A：开关批注模式（和 Cmd+A 全选不冲突）
+    if (mod && e.shiftKey && k === 'a') { e.preventDefault(); toggleAnno(); return; }
     // 自己在捕获阶段接管撤销/重做：交给 execCommand（和工具条 ↶↷ 同一个通道，
     // 已在真实浏览器里验证有效），不依赖页面的 keydown 处理器和浏览器默认行为。
     if (mod && k === 'z' && S.active) {
@@ -552,6 +592,7 @@
       return;
     }
     if (e.key === 'Escape') {
+      if (S.anno && !S.popup) { exitAnno(); return; }
       if (S.popup) closePopup();
       else if (S.move) setMoveMode(false);
       else if (S.active) deactivate();
@@ -600,6 +641,8 @@
        display:flex;align-items:center;justify-content:center;background:#4f9cf9;color:#04101f;font-size:17px;
        border:none;box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer;font-weight:700}
   .fab:hover{filter:brightness(1.08)}
+  .fab.anno{right:16px;bottom:64px;background:#f0b429;color:#231a00;font-size:16px}
+  .fab.anno.on{background:#e5484d;color:#fff}
   .toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:2147483647;
          background:#20272f;color:#e6ebf2;border:1px solid #2b3441;border-radius:9px;padding:8px 14px;
          font-size:12.5px;box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;transition:opacity .18s;
@@ -661,6 +704,11 @@
       fab.title = 'HTML Studio：编辑这个页面';
       fab.onclick = () => activate();
       shadow.appendChild(fab);
+      const af = el('button', 'fab anno' + (S.anno ? ' on' : ''), S.anno ? '✕' : '💬');
+      af.type = 'button';
+      af.title = S.anno ? 'HTML Studio：退出批注模式' : 'HTML Studio：划词批注';
+      af.onclick = () => toggleAnno();
+      shadow.appendChild(af);
       return;
     }
 

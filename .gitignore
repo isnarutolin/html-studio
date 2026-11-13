@@ -5,6 +5,8 @@ signing-key.pem
 key.pem
 
 # ---- 运行时产生的数据 ----
+data/
+access-code.txt
 .edits/
 *.log
 nohup.out
