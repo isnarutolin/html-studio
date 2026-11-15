@@ -2,6 +2,23 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.4.0] - 2025
+
+### 新增
+
+- **`server/`：常驻服务层收进仓库**（之前只在作者本机的一套脚本，现已可复现部署）
+  - `review-server.mjs`：批注注入 + SSE 实时同步 + **`/p/<url>` 链接转换网关**（含 SSRF 防护、`/api/convert`）
+  - `bore-tunnel.sh`：公网隧道，带看门狗（免费 bore 会悄悄僵死，keepalive 只管进程退出）且已参数化
+  - `share-link.sh` / `anno-url.sh`：一键看全部链接与服务健康 / 把任意 HTML 链接转成可批注地址
+  - `install.sh`：部署脚本 → 生成 launchd plist（模板化，`$HOME` 与 node/python 路径安装时探测）→ 加载重启；`--check` 查漂移
+  - `launchd/*.plist.tmpl`：8899、7788 及两条隧道的模板（脱敏，无硬编码用户路径）
+  - 脚本章节里所有个人约定（`~/html-annotator-kit`、默认 docId）都改为「脚本自身目录 + 环境变量」可覆盖
+- 引擎查找加回落：`review-server.mjs` 部署态用同目录 `annotator.js`，在仓库内直接跑则回落 `skills/html-annotate/lib/annotator.js`
+
+### 文档
+
+- 新增 [`server/README.md`](server/README.md)：部署、批注数据布局、`/p/` 用法、安全边界、公网隧道的两个已知特性（端口会漂、~12KB/s）、合盖即断
+
 ## [1.3.1] - 2025
 
 ### 修复 / 打通

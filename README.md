@@ -238,6 +238,25 @@ python3 skills/html-annotate/scripts/serve.py --dir ./reports       # 多人实�
 
 macOS 完整支持。Linux 逻辑相同但未实机验证。Windows 的扩展部分为实验性（注册表 + `.cmd` 启动器），网页版三平台通用。细节见 [FAQ](docs/FAQ.md)。
 
+## 部署成长期在线的入口（可选）
+
+编辑器本身不需要这一层。想把「改 + 批注」做成一个**发给同事就能打开用**的常驻入口，用 [`server/`](server/README.md)：
+
+```bash
+cd server
+./install.sh --plists --load     # 部署脚本 + 生成 launchd（开机自启）+ 重启
+./install.sh --check             # 检查已部署目录与仓库是否一致
+```
+
+| 组件 | 端口 | 作用 |
+| --- | --- | --- |
+| `review-server.mjs` | 8899 | 批注注入 + 实时同步 + **`/p/<url>` 链接转换网关** |
+| `server.py` | 7788 | 网页版一站式（改 + 批注） |
+| `bore-tunnel.sh` | — | 公网隧道（带看门狗） |
+| `share-link.sh` / `anno-url.sh` | — | 一眼看全部链接 / 把任意链接转成可批注地址 |
+
+细节、安全边界和已知限制（端口会漂、带宽有限、合盖即断）见 [`server/README.md`](server/README.md)。
+
 ## 开发者
 
 ```bash

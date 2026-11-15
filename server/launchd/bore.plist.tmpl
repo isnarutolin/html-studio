@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 模板：install.sh 替换 __LABEL__ / __DIR__ / __LOG__ / __PORTFILE__ / __PORTS__ / __HEALTH__ -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>__LABEL__</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__DIR__/bore-tunnel.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>LOCAL_PORT</key>
+    <string>__LOCAL_PORT__</string>
+    <key>BORE_PORTS</key>
+    <string>__PORTS__</string>
+    <key>BORE_PORTFILE</key>
+    <string>__PORTFILE__</string>
+    <key>BORE_LOG</key>
+    <string>__LOG__</string>
+    <key>BORE_HEALTH</key>
+    <string>__HEALTH__</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>__DIR__/logs/bore.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__DIR__/logs/bore.err.log</string>
+</dict>
+</plist>

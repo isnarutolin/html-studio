@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 模板：install.sh 替换 __LABEL__ / __PYTHON__ / __HTMLSTUDIO__ / __HOME__ / __ANNO_DATA__ -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>__LABEL__</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PYTHON__</string>
+    <string>__HTMLSTUDIO__/server.py</string>
+    <string>--port</string>
+    <string>7788</string>
+    <string>--dir</string>
+    <string>__HOME__</string>
+    <string>--no-browser</string>
+    <string>--anno-data</string>
+    <string>__ANNO_DATA__</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__HTMLSTUDIO__</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/html-studio.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/html-studio.err.log</string>
+</dict>
+</plist>
