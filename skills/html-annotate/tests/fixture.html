@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>批注自检样例</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-abc123' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'">
+<style>
+  body { font: 16px/1.8 -apple-system, "PingFang SC", sans-serif; margin: 40px auto; max-width: 720px; }
+  h1 { font-size: 24px; } .k { background: #eef; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>批注能力自检样例</h1>
+<p>这份文件用来验证 <span class="k">annotate.py</span> 与 <span class="k">serve.py</span> 的关键行为：
+引擎是否注入、CSP 是否放宽、nonce 是否移除、docId 是否稳定。</p>
+<p>故意带了一个严苛的 CSP（<code>script-src 'nonce-abc123'</code> + <code>connect-src 'none'</code>），
+不改写它的话，批注引擎会被浏览器静默拦掉 —— 这正是最常见的"页面能开但没有批注按钮"。</p>
+<p>请在这段文字上划词试试：应当浮出「批注」按钮。</p>
+<script nonce="abc123">/* 原稿里的内联脚本，注入后 nonce 属性应被移除 */</script>
+</body>
+</html>

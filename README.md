@@ -138,6 +138,22 @@ bore local 8899 --to bore.pub      # 得到一个 http://bore.pub:<端口> 的�
 - 身份是「浏览器 cookie + 署名先到先得」，防的是「顺手改个名字就删别人的」，**不是强身份认证**
 - 批注服务跑在你的机器上 —— 机器睡了/关机了，链接就打不开
 
+### 作为 Agent Skill 用（不装扩展、不要 node）
+
+只想让「给我加批注」变成一条命令（比如让 AI 生成完 HTML 后自己调），用 `skills/html-annotate/`。
+**纯 Python 标准库，零依赖**，不需要装浏览器扩展、不需要 `install.py`、不需要 node：
+
+```bash
+python3 skills/html-annotate/scripts/annotate.py report.html        # → report.annotated.html
+python3 skills/html-annotate/scripts/serve.py --dir ./reports       # 多人实时，默认 8899
+```
+
+- `annotate.py` 产出**自包含单文件**：引擎内联、放开 CSP、去掉 nonce，双击就能批注（离线可用，数据在 localStorage）
+- `serve.py` 就是上面的 `collab.py`，注入 + 实时同步 + 作者权限
+- 自检：`bash skills/html-annotate/tests/smoke.sh`（15 项，不联网不用浏览器）
+
+详细用法与踩坑见 [`skills/html-annotate/SKILL.md`](skills/html-annotate/SKILL.md)。
+
 ## 保存前先看 diff
 这是它敢让你直接动生产文件的原因。点保存会弹出逐行 diff，认了才落盘。
 
