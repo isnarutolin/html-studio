@@ -107,12 +107,23 @@ skills/html-annotate/
 ├── lib/annotator.js      # 批注引擎（单文件）
 ├── scripts/annotate.py   # 单机注入（纯标准库）
 ├── scripts/serve.py      # 多人实时服务（纯标准库）
-└── tests/                # smoke.sh + fixture.html
+└── tests/
+    ├── smoke.sh          # 自检：注入 / 幂等 / 服务注入，15 项
+    ├── check-sync.sh     # 三份引擎是否同源（开发机用，外部用户自动跳过）
+    └── fixture.html      # 带严苛 CSP 的样例稿
 ```
 
-> `lib/annotator.js` 的**生产真源在 `html-annotator-kit/annotator.js`**（也就是起 8899 的那套）。
-> `extension/lib/annotator.js` 只是多了一段 `__ANNO_DISABLE_AUTOINIT__ = true`（扩展要按需初始化）。
-> 改引擎时只改 kit 那份，然后同步到这里和 `extension/lib/`，否则三份会分叉。
+> `lib/annotator.js` 的**生产真源在 `html-annotator-kit/annotator.js`**（起 8899 的那套）。
+> `extension/lib/annotator.js` 只是真源 + 9 行文件头（`__ANNO_DISABLE_AUTOINIT__ = true`，扩展要按需初始化）。
+> 改引擎只改真源，然后：
+>
+> ```bash
+> bash tests/check-sync.sh          # 检查三份是否同源（不同源直接报错，退出码 1）
+> bash tests/check-sync.sh --fix    # 以真源为准，重写另外两份
+> ```
+>
+> 文件头用**内置常量**校验，不从被检查文件里读 —— 否则把头改坏了会自己跟自己比、查不出来。
+> 另外它还会确认扩展副本没丢 `__ANNO_DISABLE_AUTOINIT__`（丢了会让扩展在每个页面自动挂批注）。
 
 引擎的 API（给需要程序化控制的人）：
 
