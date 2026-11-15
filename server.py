@@ -108,16 +108,59 @@ def now_stamp():
 
 
 class App:
-    def __init__(self, root):
+    def __init__(self, root, anno_data=None):
         self.root = os.path.abspath(os.path.expanduser(root))
         os.makedirs(self.root, exist_ok=True)
-        # 批注数据放 .edits/anno（和工作目录绑定，跟着文件走，不污染 ~ 根目录）
-        self.anno = ANNO.Store(os.path.join(self.root, ".edits", "anno")) if ANNO else None
+        # 批注数据默认放 <root>/.edits/anno；可用 --anno-data 指向 8899 批注服务的数据目录，
+        # 两边共用同一份 JSON（Store 已按 mtime 失效，跨进程不会互相覆盖）。
+        data_dir = anno_data or os.path.join(self.root, ".edits", "anno")
+        self.anno = ANNO.Store(os.path.abspath(os.path.expanduser(data_dir))) if ANNO else None
         self.hub = ANNO.Hub() if ANNO else None
+        self._map_lock = threading.Lock()
+
+    # ---------- 批注 docId ----------
+    # 和 8899 的约定对齐：用文件名（heping-hotel-diagnosis），不用全路径，
+    # 这样同一份稿子在两个入口看到的是同一批批注。
+    # 万一两个目录下有同名文件，则退回全路径版，并在 _paths.json 里记住归属。
+    def _map_path(self):
+        return os.path.join(self.anno.dir, "_paths.json")
+
+    def _load_map(self):
+        try:
+            with open(self._map_path(), encoding="utf-8") as f:
+                m = json.load(f)
+            return m if isinstance(m, dict) else {}
+        except Exception:
+            return {}
+
+    def _save_map(self, m):
+        try:
+            tmp = self._map_path() + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(m, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, self._map_path())
+        except Exception as e:  # noqa: BLE001
+            print(f"[anno] 路径映射写入失败: {e}", file=sys.stderr)
 
     def doc_id(self, rel):
-        """批注按文件路径归档：/reports/q3.html → reports_q3"""
-        return ANNO.safe_name(re.sub(r"\.html?$", "", rel, flags=re.I)) if ANNO else "doc"
+        """批注归档 ID：默认与 8899 一致的「文件名」；同名不同目录时才退回路径版。"""
+        if not ANNO:
+            return "doc"
+        base = ANNO.safe_name(re.sub(r"\.html?$", "", os.path.basename(rel), flags=re.I))
+        with self._map_lock:
+            m = self._load_map()
+            owner = m.get(base)
+            if owner in (None, rel):
+                if owner is None:
+                    m[base] = rel
+                    self._save_map(m)
+                return base
+            # 已有同名文件占用这个 ID：用全路径版，避免两份稿子串批注
+            full = ANNO.safe_name(re.sub(r"\.html?$", "", rel.replace("/", "_"), flags=re.I))
+            if m.get(full) != rel:
+                m[full] = rel
+                self._save_map(m)
+            return full
 
     # ---------- path helpers ----------
     @property
@@ -276,6 +319,27 @@ class Handler(BaseHTTPRequestHandler):
     def json(self, obj, code=200):
         self._send(code, json.dumps(obj, ensure_ascii=False), "application/json; charset=utf-8")
 
+    def send_big(self, body: bytes, ctype: str):
+        """带 gzip + ETag/304 的大响应。
+        内联了 echarts 的稿子 1MB+，走公网隧道（免费 bore ≈ 12KB/s）要 60 秒；
+        gzip 后 ~350KB，再加 ETag 让重复打开变 304（几百字节），才可能可用。"""
+        etag = '"' + hashlib.md5(body).hexdigest()[:16] + '"'
+        if (self.headers.get("If-None-Match") or "") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            return
+        accepts_gzip = "gzip" in (self.headers.get("Accept-Encoding") or "").lower()
+        if accepts_gzip and len(body) > 1400:
+            import gzip as _gzip
+            body = _gzip.compress(body, 6)
+            extra = {"Content-Encoding": "gzip", "Vary": "Accept-Encoding", "ETag": etag,
+                     "Cache-Control": "no-cache"}
+        else:
+            extra = {"ETag": etag, "Cache-Control": "no-cache"}
+        self._send(200, body, ctype, extra)
+
     def err(self, msg, code=400):
         self.json({"ok": False, "error": str(msg)}, code)
 
@@ -389,10 +453,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/__anno/engine.js":
             if not _ENGINE_SRC:
                 return self.err("找不到批注引擎 annotator.js", 404)
-            return self._send(200, _ENGINE_SRC.encode("utf-8"),
-                              "application/javascript; charset=utf-8",
-                              {"Cache-Control": "public, max-age=300"})
-
+            # 56KB → gzip 后 ~15KB：公网隧道下差 5 秒和 1 秒的体验
+            return self.send_big(_ENGINE_SRC.encode("utf-8"),
+                                 "application/javascript; charset=utf-8")
         # ---- 批注 API（路径前缀 /__anno/api，与 editor 自己的 /api/* 不冲突）----
         if path == "/__anno/api/health":
             return self.json({"ok": ANNO is not None, "inject": True, "annotate": ANNO is not None})
@@ -418,7 +481,7 @@ class Handler(BaseHTTPRequestHandler):
                 # 放宽 CSP + 挂上引擎：iframe 里才跑得起批注（保存时会还原/剥离）
                 html = relax_csp(APP.read_text(full))
                 html = inject_anno(html, APP.doc_id(rel))
-                return self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+                return self.send_big(html.encode("utf-8"), "text/html; charset=utf-8")
             if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml"):
                 ctype += "; charset=utf-8"
             with open(full, "rb") as f:
@@ -538,10 +601,12 @@ def main():
     ap.add_argument("--dir", default=os.path.expanduser("~"))
     ap.add_argument("--port", type=int, default=7788)
     ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--anno-data", default="",
+                    help="批注数据目录（默认 <dir>/.edits/anno；指向 8899 的 data 就能共用批注）")
     ap.add_argument("--no-browser", action="store_true", help="启动时不自动打开浏览器")
     args = ap.parse_args()
 
-    APP = App(args.dir)
+    APP = App(args.dir, args.anno_data or None)
     url = f"http://{args.host}:{args.port}"
     try:
         srv = ThreadingHTTPServer((args.host, args.port), Handler)

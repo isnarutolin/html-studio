@@ -61,6 +61,7 @@ class Store:
         self.dir = data_dir
         self.lock = threading.RLock()
         self.docs: dict[str, list] = {}
+        self._mtimes: dict[str, float] = {}   # 跨进程一致：文件被别的进程改过就重载
         self.identities: dict[str, str] = {}
         os.makedirs(self.dir, exist_ok=True)
         self._ident_path = os.path.join(self.dir, "identity.json")
@@ -76,9 +77,18 @@ class Store:
     def _doc_path(self, doc: str) -> str:
         return os.path.join(self.dir, safe_name(doc) + ".json")
 
+    def _mtime(self, doc: str) -> float:
+        try:
+            return os.stat(self._doc_path(doc)).st_mtime
+        except OSError:
+            return 0.0
+
     def load(self, doc: str) -> list:
+        """同一份 JSON 可能被多个服务（8899 批注服务 / 7788 网页版）同时读写，
+        所以缓存必须按文件 mtime 失效，否则两边会互相覆盖。"""
         with self.lock:
-            if doc in self.docs:
+            disk_m = self._mtime(doc)
+            if doc in self.docs and self._mtimes.get(doc) == disk_m:
                 return self.docs[doc]
             anns: list = []
             try:
@@ -89,6 +99,7 @@ class Store:
             except Exception:
                 pass
             self.docs[doc] = anns
+            self._mtimes[doc] = disk_m
             return anns
 
     def persist(self, doc: str) -> None:
@@ -100,6 +111,7 @@ class Store:
                 with open(tmp, "w", encoding="utf-8") as f:
                     json.dump(payload, f, ensure_ascii=False, indent=2)
                 os.replace(tmp, self._doc_path(doc))
+                self._mtimes[doc] = self._mtime(doc)
             except Exception as e:
                 print(f"[persist] 写入失败: {e}", file=sys.stderr)
 
