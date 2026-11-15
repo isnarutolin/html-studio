@@ -15,13 +15,82 @@ import hashlib
 import json
 import mimetypes
 import os
+import queue
 import re
 import sys
+import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_PATH = os.path.join(HERE, "ui.html")
+
+# ── 批注能力：复用 skills/html-annotate/scripts/serve.py 里的 Store / Hub
+# （同一仓库、同一份实现，不另写第三份；导入失败时批注功能自动关掉，编辑器照常用）
+_ANNO_SCRIPTS = os.path.join(HERE, "skills", "html-annotate", "scripts")
+ANNO = None
+if os.path.isdir(_ANNO_SCRIPTS) and _ANNO_SCRIPTS not in sys.path:
+    sys.path.insert(0, _ANNO_SCRIPTS)
+try:
+    import serve as ANNO  # noqa: N813  (Store / Hub / safe_name)
+except Exception as _e:  # noqa: BLE001
+    print(f"[warn] 批注模块未加载，只提供编辑：{_e}", file=sys.stderr)
+
+ENGINE_CANDIDATES = (
+    os.path.join(HERE, "skills", "html-annotate", "lib", "annotator.js"),
+    os.path.join(HERE, "extension", "lib", "annotator.js"),
+)
+
+
+def load_engine():
+    for p in ENGINE_CANDIDATES:
+        if os.path.isfile(p):
+            with open(p, encoding="utf-8") as f:
+                return f.read()
+    return ""
+
+
+_ENGINE_SRC = load_engine()
+
+# 一份「批注能跑、外链还能用」的 CSP；原值存在 data-hs-csp 里，保存时还原
+RELAXED_CSP = (
+    "default-src 'self' https: http: data: blob: 'unsafe-inline' 'unsafe-eval'; "
+    "script-src 'self' https: http: 'unsafe-inline' 'unsafe-eval'; "
+    "style-src 'self' https: http: 'unsafe-inline'; "
+    "img-src 'self' https: http: data: blob:; "
+    "font-src 'self' https: http: data:; "
+    "connect-src 'self' https: http:; "
+    "object-src 'none'; base-uri 'self'; form-action 'self'"
+)
+CSP_META_RE = re.compile(r'<meta[^>]+http-equiv\s*=\s*["\']?Content-Security-Policy["\']?[^>]*>', re.I)
+
+
+def relax_csp(html):
+    def repl(m):
+        tag = m.group(0)
+        # CSP 值里本身就有单引号（'unsafe-inline'），必须按「同种引号配对」截
+        orig = re.search(r'content\s*=\s*(["\'])(.*?)\1', tag, re.I | re.S)
+        val = orig.group(2) if orig else ""
+        val = val.replace('&', '&amp;').replace('"', "&quot;").replace('<', "&lt;")
+        return f'<meta http-equiv="Content-Security-Policy" data-hs-csp="{val}" content="{RELAXED_CSP}">'
+    return CSP_META_RE.sub(repl, html)
+
+
+def inject_anno(html, doc_id):
+    """给 /files/ 返回的 HTML 挂上批注引擎（手动初始化：由 ui.html 按需 init）。
+    注入物都带 data-hs-anno 标记，保存时靠它剥干净，不污染用户文件。"""
+    if not _ENGINE_SRC or "data-hs-anno" in html:
+        return html
+    cfg = (
+        '<script data-hs-anno="cfg">window.__ANNO_DISABLE_AUTOINIT__=true;'
+        'window.__HS_ANNO__={docId:' + json.dumps(doc_id, ensure_ascii=False) + ',base:"/__anno"};</script>'
+    )
+    tag = (cfg +
+           '<script data-hs-anno="engine" src="/__anno/engine.js"></script>\n')
+    if re.search(r"</body>", html, re.I):
+        return re.sub(r"</body>", lambda m: tag + "</body>", html, count=1, flags=re.I)
+    return html + tag
 
 SKIP_DIRS = {
     ".git", ".svn", "node_modules", ".edits", "__pycache__", ".venv", "venv",
@@ -42,6 +111,13 @@ class App:
     def __init__(self, root):
         self.root = os.path.abspath(os.path.expanduser(root))
         os.makedirs(self.root, exist_ok=True)
+        # 批注数据放 .edits/anno（和工作目录绑定，跟着文件走，不污染 ~ 根目录）
+        self.anno = ANNO.Store(os.path.join(self.root, ".edits", "anno")) if ANNO else None
+        self.hub = ANNO.Hub() if ANNO else None
+
+    def doc_id(self, rel):
+        """批注按文件路径归档：/reports/q3.html → reports_q3"""
+        return ANNO.safe_name(re.sub(r"\.html?$", "", rel, flags=re.I)) if ANNO else "doc"
 
     # ---------- path helpers ----------
     @property
@@ -204,10 +280,63 @@ class Handler(BaseHTTPRequestHandler):
         self.json({"ok": False, "error": str(msg)}, code)
 
     def body_json(self):
+        # 浏览器 fetch 一定会带 Content-Length；但 curl -T / node http 等客户端可能发 chunked，
+        # 不处理会变成“请求体丢失”这种莫名奇妙的 400。
+        if "chunked" in (self.headers.get("Transfer-Encoding") or "").lower():
+            chunks = []
+            while True:
+                line = self.rfile.readline().strip()
+                size = int(line.split(b";")[0] or b"0", 16)
+                if size == 0:
+                    self.rfile.readline()
+                    break
+                chunks.append(self.rfile.read(size))
+                self.rfile.readline()
+            raw = b"".join(chunks)
+            return json.loads(raw.decode("utf-8")) if raw else {}
         n = int(self.headers.get("Content-Length") or 0)
         if not n:
             return {}
         return json.loads(self.rfile.read(n).decode("utf-8"))
+
+    # ---------- 批注 SSE ----------
+    def stream_anno(self, doc):
+        if not ANNO:
+            return self.json({"ok": False, "error": "批注模块未加载"}, 503)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-transform")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        def push(payload):
+            self.wfile.write(b"data: " + json.dumps(payload, ensure_ascii=False).encode() + b"\n\n")
+            self.wfile.flush()
+
+        q = APP.hub.subscribe(doc)
+        try:
+            self.wfile.write(b"retry: 3000\n\n")
+            push({"type": "sync", "doc": doc, "annotations": APP.anno.load(doc)})
+            push({"type": "presence", "count": APP.hub.presence(doc), "doc": doc})
+            APP.hub.broadcast(doc, {"type": "presence", "count": APP.hub.presence(doc), "doc": doc})
+            last = time.time()
+            while True:
+                try:
+                    push(q.get(timeout=25))
+                except queue.Empty:
+                    self.wfile.write(b": hb\n\n")
+                    self.wfile.flush()
+                if time.time() - last > 3600:
+                    break
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            APP.hub.unsubscribe(doc, q)
+            try:
+                APP.hub.broadcast(doc, {"type": "presence", "count": APP.hub.presence(doc), "doc": doc})
+            except Exception:  # noqa: BLE001
+                pass
 
     # ---------- GET ----------
     def do_GET(self):
@@ -253,12 +382,43 @@ class Handler(BaseHTTPRequestHandler):
             new = APP.read_text(APP.real(rel))
             return self.json({"ok": True, "diff": make_diff(old, new)})
 
+        # ---- 批注引擎源码（懒加载一次，浏览器可缓存）----
+        if path == "/favicon.ico":
+            return self._send(204, b"", "image/x-icon")
+
+        if path == "/__anno/engine.js":
+            if not _ENGINE_SRC:
+                return self.err("找不到批注引擎 annotator.js", 404)
+            return self._send(200, _ENGINE_SRC.encode("utf-8"),
+                              "application/javascript; charset=utf-8",
+                              {"Cache-Control": "public, max-age=300"})
+
+        # ---- 批注 API（路径前缀 /__anno/api，与 editor 自己的 /api/* 不冲突）----
+        if path == "/__anno/api/health":
+            return self.json({"ok": ANNO is not None, "inject": True, "annotate": ANNO is not None})
+
+        if path == "/__anno/api/state":
+            doc = (qs.get("doc") or [""])[0]
+            if not ANNO:
+                return self.json({"ok": False, "error": "批注模块未加载"}, 503)
+            return self.json({"doc": doc, "annotations": APP.anno.load(doc),
+                              "presence": APP.hub.presence(doc)})
+
+        if path == "/__anno/api/stream":
+            return self.stream_anno((qs.get("doc") or [""])[0])
+
         if path.startswith("/files/"):
             rel = path[len("/files/"):]
             full = APP.real(rel)
             if not os.path.isfile(full):
                 raise FileNotFoundError(rel)
             ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
+            ext = os.path.splitext(full)[1].lower()
+            if ext in HTML_EXT and ANNO and _ENGINE_SRC:
+                # 放宽 CSP + 挂上引擎：iframe 里才跑得起批注（保存时会还原/剥离）
+                html = relax_csp(APP.read_text(full))
+                html = inject_anno(html, APP.doc_id(rel))
+                return self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
             if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml"):
                 ctype += "; charset=utf-8"
             with open(full, "rb") as f:
@@ -276,6 +436,22 @@ class Handler(BaseHTTPRequestHandler):
     def route_post(self):
         path = urllib.parse.urlparse(self.path).path
         data = self.body_json()
+
+        if path == "/__anno/api/op":
+            if not ANNO:
+                return self.json({"ok": False, "error": "批注模块未加载"}, 503)
+            try:
+                doc = str(data.get("doc") or "")
+                op = data.get("op")
+                if not doc or not op or not op.get("type"):
+                    return self.err("缺少 doc 或 op")
+                anns = APP.anno.load(doc)
+                ANNO.Store.apply_op(anns, op)
+                APP.anno.persist(doc)
+                APP.hub.broadcast(doc, {"type": "op", "doc": doc, "op": op})
+                return self.json({"ok": True})
+            except Exception as e:  # noqa: BLE001
+                return self.err(e, 400)
 
         if path == "/api/root":
             d = os.path.abspath(os.path.expanduser(str(data.get("dir") or "")))

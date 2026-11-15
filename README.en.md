@@ -51,7 +51,7 @@ First, the important distinction: **editing** and **annotating** are two indepen
 | What you want | What you need | Entry point |
 | --- | --- | --- |
 | **Edit**: change text/fonts, drag blocks, delete pages, write back to disk | Chrome extension (native host needed for disk write) | `python3 extension/install.py` + load `extension/` |
-| **Edit in browser**: same, without installing an extension | Just a local server | `python3 server.py --dir ~/Downloads` |
+| **All-in-one (edit + annotate)**: teammates install nothing, just open a link | Just a local server | `python3 server.py --dir <dir> --host 0.0.0.0` |
 | **Annotate (solo)**: select text, leave comments, export annotated HTML | **Nothing** | `python3 skills/html-annotate/scripts/annotate.py x.html` |
 | **Annotate (live, multi-user)** | **Nothing** | `python3 skills/html-annotate/scripts/serve.py --dir ./reports` |
 
@@ -151,6 +151,27 @@ Honest security boundaries:
 - **Without a passcode, anyone with the link can read and annotate.** Add `--passcode` to lock it down.
 - Identity is "browser cookie + first-come-first-served display name". It stops accidental deletion of someone else's comment; it is **not** real authentication.
 - The server runs on your machine — if it sleeps or shuts down, the link stops working.
+
+### All-in-one: edit and annotate from one link, zero install
+
+If you don't want anyone installing anything, use the web app (`server.py`). One link gives you both:
+
+```bash
+python3 server.py --dir ~/Desktop/reports --host 0.0.0.0   # reachable on the LAN
+```
+
+Colleagues open `http://<your-ip>:7788/`:
+
+| Button | What it does | Where it lands |
+| --- | --- | --- |
+| **Edit mode** (default) | Click text to change it, swap fonts, drag blocks, delete pages | Writes back to the file **on your machine**, with diff + automatic backup |
+| **Annotate** (also `Cmd/Ctrl+Shift+A`) | Select text → leave a comment → reply / resolve | `<dir>/.edits/anno/<file>.json` on the server, live sync for everyone |
+
+The two modes are mutually exclusive: entering annotation exits editing, and once you leave, the annotation UI is invisible to the editor.
+**Annotations never touch the document** — on save, the injected engine, highlight wrappers and relaxed CSP are all stripped back out (verified byte-identical to an edit-only save).
+
+> Security note: with `--host 0.0.0.0`, anyone on your LAN who has the address can edit **any HTML under `--dir`**.
+> Don't share `--dir ~`; point it at a dedicated folder.
 
 ### As an Agent Skill (no extension, no node)
 

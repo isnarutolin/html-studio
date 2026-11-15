@@ -932,6 +932,7 @@ window.__ANNO_DISABLE_AUTOINIT__ = true;
 
     // 隐藏的文件输入
     var fileInput = document.createElement('input');
+    fileInput.className = 'anno-ui anno-fileinput';  // 带 anno-ui：宿主保存时能一键剥干净
     fileInput.type = 'file';
     fileInput.accept = '.json,application/json';
     fileInput.style.display = 'none';

@@ -136,6 +136,7 @@
       <span class="badge edit" id="badgeEdit" style="display:none">编辑中</span>
       <div class="spacer"></div>
       <button id="btnEdit" title="切换编辑 / 预览">编辑模式</button>
+      <button id="btnAnno" title="批注模式：划选文字留意见（Cmd/Ctrl+Shift+A）">批注</button>
       <button id="btnReload" title="放弃修改并重新载入">重新载入</button>
       <button id="btnUndo" disabled title="撤销上一次保存">撤销保存</button>
       <button id="btnBackups" title="备份历史">备份</button>
@@ -206,7 +207,7 @@
 <script>
 const $ = s => document.querySelector(s);
 const frame = $('#frame');
-const state = { root:'', files:[], current:null, dirty:false, editing:true, lastBackup:null, panelMode:null };
+const state = { root:'', files:[], current:null, dirty:false, editing:true, anno:false, lastBackup:null, panelMode:null };
 
 /* ---------------- api ---------------- */
 async function api(method, url, body){
@@ -327,6 +328,7 @@ function setupEditor(){
 
   applyMode();
   updateUI();
+  if (state.anno) initAnno();
 }
 
 function applyMode(){
@@ -371,9 +373,28 @@ function compactSVG(html){
     block => block.replace(re, (m, tag, attrs) => `<${tag}${attrs || ''}/>`));
 }
 
+/* 保存前把批注引擎的产物剥干净：注入的 script、运行时 UI、高亮包裹、放宽过的 CSP */
+function stripAnno(clone){
+  clone.querySelectorAll('script[data-hs-anno]').forEach(n => n.remove());
+  clone.querySelectorAll('.anno-ui, #anno-style, .anno-tip, .anno-bubble, .anno-fab, .anno-sidebar').forEach(n => n.remove());
+  clone.classList.remove('anno-hidden');
+  clone.querySelectorAll('.anno-shift').forEach(n => n.classList.remove('anno-shift'));
+  [...clone.querySelectorAll('.anno-hl')].forEach(hl => {
+    const p = hl.parentNode;
+    if (!p) return;
+    while (hl.firstChild) p.insertBefore(hl.firstChild, hl);
+    p.removeChild(hl);
+  });
+  clone.querySelectorAll('meta[data-hs-csp]').forEach(m => {
+    m.setAttribute('content', m.getAttribute('data-hs-csp'));
+    m.removeAttribute('data-hs-csp');
+  });
+}
+
 function getHTML(){
   const doc = frame.contentDocument;
   const clone = doc.documentElement.cloneNode(true);
+  stripAnno(clone);
   const st = clone.querySelector('#__editor_style__');
   if (st) st.remove();
   const b = clone.querySelector('body');
@@ -395,6 +416,7 @@ function markDirty(){ if (!state.dirty){ state.dirty = true; updateUI(); } }
 function onKeyDown(e){
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === 's'){ e.preventDefault(); save(); }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'a'){ e.preventDefault(); toggleAnno(); return; }
   if (mod && e.key.toLowerCase() === 'e'){ e.preventDefault(); toggleEdit(); }
 }
 
@@ -541,8 +563,12 @@ function updateUI(){
   fp.textContent = has ? state.current : '未选择文件';
   fp.classList.toggle('none', !has);
   $('#badgeDirty').style.display = state.dirty ? '' : 'none';
-  $('#badgeEdit').style.display = state.editing && has ? '' : 'none';
+  $('#badgeEdit').style.display = (state.editing || state.anno) && has ? '' : 'none';
+  $('#badgeEdit').textContent = state.anno ? '批注中' : '编辑中';
+  $('#badgeEdit').classList.toggle('dirty', !!state.anno);
   $('#btnEdit').textContent = state.editing ? '预览模式' : '编辑模式';
+  $('#btnAnno').textContent = state.anno ? '退出批注' : '批注';
+  $('#btnAnno').classList.toggle('primary', !!state.anno);
   $('#btnSave').disabled = !has;
   $('#btnReload').disabled = !has;
   $('#btnBackups').disabled = !has;
@@ -550,9 +576,47 @@ function updateUI(){
 }
 
 function toggleEdit(){
+  if (state.anno){ state.anno = false; deactivateAnno(); }
   state.editing = !state.editing;
   applyMode(); updateUI();
   toast(state.editing ? '编辑模式：直接点文字修改' : '预览模式：可点击链接');
+}
+
+/* ---------------- 批注模式 ---------------- */
+function annoWin(){
+  try { return frame.contentDocument && frame.contentDocument.defaultView; } catch(e){ return null; }
+}
+
+function initAnno(){
+  if (!state.anno) return;
+  const w = annoWin();
+  if (!w) return;
+  const A = w.HtmlAnnotator;
+  if (!A){ toast('这份文件没挂上批注引擎（不是 HTML？或者引擎缺失）'); return; }
+  const info = w.__HS_ANNO__ || {};
+  try {
+    if (!A.isInited()) A.init({ docId: info.docId, remote: info.base || '/__anno' });
+    else A.setActive(true);
+  } catch(e){ toast('批注启动失败: ' + e.message); }
+}
+
+function deactivateAnno(){
+  const w = annoWin();
+  try { w && w.HtmlAnnotator && w.HtmlAnnotator.setActive(false); } catch(e) {}
+}
+
+function toggleAnno(){
+  if (!state.current){ toast('先选一份文件'); return; }
+  state.anno = !state.anno;
+  if (state.anno){
+    if (state.editing){ state.editing = false; applyMode(); }
+    initAnno();
+    toast('批注模式：划选文字 → 点浮出的「批注」→ 写意见');
+  } else {
+    deactivateAnno();
+    toast('已退出批注模式（批注已存在服务器，重新进入即可看到）');
+  }
+  updateUI();
 }
 
 /* ---------------- wiring ---------------- */
@@ -562,6 +626,7 @@ $('#rootInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#bt
 
 $('#btnSave').onclick = save;
 $('#btnEdit').onclick = toggleEdit;
+$('#btnAnno').onclick = toggleAnno;
 $('#btnUndo').onclick = undoLast;
 $('#btnBackups').onclick = showBackups;
 $('#btnReload').onclick = () => {

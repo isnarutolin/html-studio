@@ -2,7 +2,24 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.2.1] - 2025
+## [1.3.0] - 2025
+
+### 新增
+
+- **一站式：网页版现在既能改、也能批注**（`server.py`，7788）。
+  同事零安装，打开一个链接就能：改文字/排版（服务端写盘，带 diff + 备份）、划词留意见（实时同步）。
+  ```bash
+  python3 server.py --dir ~/Desktop/reports --host 0.0.0.0   # 同事用你的局域网 IP 访问
+  ```
+  - `/files/<path>` 返回 HTML 时自动「放宽 CSP + 挂上批注引擎」；批注 API 在 `/__anno/*`，与编辑器自己的 `/api/*` 不冲突
+  - 批注数据复用 `skills/html-annotate/scripts/serve.py` 的 `Store`/`Hub`（同一份实现，不另写第三套），落在 `<dir>/.edits/anno/<docId>.json`
+  - 「编辑」与「批注」互斥：进批注自动退编辑，引擎 `setActive(false)` 后所有批注 UI 对编辑不可见
+  - **保存时自动剥干净**：注入的 `script[data-hs-anno]`、运行时 UI、高亮包裹（`.anno-hl` 拆分还原）、`anno-hidden` class，并把 CSP `content` 从 `data-hs-csp` 原样还回去 —— 实测「批注后保存」与「纯编辑保存」字节级一致
+- 引擎：导入 JSON 用的隐藏 `<input type=file>` 补上 `anno-ui` class，宿主能一键剥干净
+- `server.py` 支持 `Transfer-Encoding: chunked` 请求体（之前只有 `Content-Length`，非浏览器客户端会莫名 400）
+- `/favicon.ico` 返回 204，不再在控制台刷 404
+
+### 文档## [1.2.1] - 2025
 
 ### 新增
 
