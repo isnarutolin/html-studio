@@ -46,9 +46,20 @@ All of them can edit. The difference is **what's left afterwards**. DevTools is 
 
 ## 30-second setup
 
-Two entry points — pick one.
+First, the important distinction: **editing** and **annotating** are two independent tracks — don't install the wrong one.
 
-### Option 1: Chrome extension (recommended — edits any local HTML)
+| What you want | What you need | Entry point |
+| --- | --- | --- |
+| **Edit**: change text/fonts, drag blocks, delete pages, write back to disk | Chrome extension (native host needed for disk write) | `python3 extension/install.py` + load `extension/` |
+| **Edit in browser**: same, without installing an extension | Just a local server | `python3 server.py --dir ~/Downloads` |
+| **Annotate (solo)**: select text, leave comments, export annotated HTML | **Nothing** | `python3 skills/html-annotate/scripts/annotate.py x.html` |
+| **Annotate (live, multi-user)** | **Nothing** | `python3 skills/html-annotate/scripts/serve.py --dir ./reports` |
+
+> **If all you want is annotation, do not run `extension/install.py` and do not load the extension.**
+> Annotation is a separate track: pure Python standard library, zero dependencies. See
+> [Annotation](#annotation-leave-comments-on-the-page) / [`skills/html-annotate/SKILL.md`](skills/html-annotate/SKILL.md).
+
+### Edit · Option 1: Chrome extension (recommended — edits any local HTML)
 
 ```bash
 git clone https://github.com/isnarutolin/html-studio.git
@@ -73,7 +84,7 @@ Open any local `.html`; a ✎ appears in the bottom-right corner. Click it to st
 
 Stuck on a step? Click the extension's **toolbar icon** (🧩 → HTML Studio) — the self-check page verifies "extension loaded / file-URL access / native host connectivity" live and tells you exactly what to fix. Command-line equivalent: `python3 extension/install.py --check`.
 
-### Option 2: Local web app (no extension)
+### Edit · Option 2: Local web app (no extension)
 
 ```bash
 python3 server.py --dir ~/Downloads      # port 7788 by default
@@ -96,7 +107,11 @@ Editing is "I changed it"; annotating is "I think this needs changing". Annotati
 
 ### Solo (default, no server needed)
 
-Click 💬 in the bottom-right corner (or `Cmd/Ctrl + Shift + A`) → select text → click the floating "批注" button → write. The sidebar supports replies and resolving. Turning annotation mode off hides the highlights; the document itself is untouched byte for byte.
+**With the extension installed**: click 💬 in the bottom-right corner (or `Cmd/Ctrl + Shift + A`) → select text → click the floating "批注" button → write.
+
+**Without the extension**: `python3 skills/html-annotate/scripts/annotate.py report.html` produces `report.annotated.html` with the engine inlined — just double-click it.
+
+Both routes use the same engine. The sidebar supports replies and resolving; turning annotation mode off hides the highlights, and the document itself is untouched byte for byte.
 
 Annotations live in the browser's `localStorage` by default. Three buttons in the sidebar header take them elsewhere:
 
@@ -136,6 +151,28 @@ Honest security boundaries:
 - **Without a passcode, anyone with the link can read and annotate.** Add `--passcode` to lock it down.
 - Identity is "browser cookie + first-come-first-served display name". It stops accidental deletion of someone else's comment; it is **not** real authentication.
 - The server runs on your machine — if it sleeps or shuts down, the link stops working.
+
+### As an Agent Skill (no extension, no node)
+
+If you just want "annotate this HTML" to be one command (e.g. let an AI call it right after generating a page), use `skills/html-annotate/`.
+**Pure Python standard library, zero dependencies** — no browser extension, no `install.py`, no node:
+
+```bash
+python3 skills/html-annotate/scripts/annotate.py report.html        # → report.annotated.html
+python3 skills/html-annotate/scripts/serve.py --dir ./reports       # live, port 8899
+```
+
+- `annotate.py` produces a **self-contained single file**: engine inlined, CSP relaxed, nonce stripped — double-click and annotate (works offline, data in localStorage)
+- `serve.py` is the `collab.py` above — injection + live sync + author-only permissions
+- Self-test: `bash skills/html-annotate/tests/smoke.sh` (15 checks, no network, no browser)
+
+Installing it as a skill is just a clone — no package manager involved:
+
+```bash
+cp -r skills/html-annotate ~/.agents/skills/    # Claude Code: ~/.claude/skills/
+```
+
+Full usage and pitfalls: [`skills/html-annotate/SKILL.md`](skills/html-annotate/SKILL.md).
 
 ## See the diff before you save
 

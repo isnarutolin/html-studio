@@ -2,6 +2,26 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.1] - 2025
+
+### 新增
+
+- **`skills/html-annotate/`：把批注做成 Agent Skill**（纯 Python 标准库，零依赖）。
+  不装扩展、不用 node、不用 pip，clone 完丢进 skills 目录即可：
+  ```bash
+  python3 skills/html-annotate/scripts/annotate.py report.html   # → report.annotated.html
+  python3 skills/html-annotate/scripts/serve.py --dir ./reports  # 多人实时，默认 8899
+  ```
+  - `annotate.py` 产出**自包含单文件**：引擎内联、CSP 自动放宽、nonce 自动剔除，双击即可批注（离线可用）
+  - `annotate.py` 额外修掉两处坑：`--author` 原本静默失效（引擎 init 时 `document.currentScript` 已为 null，读不到 `data-author`，改成预置 localStorage 默认署名）；`file://` 直开时控制台必报 `ERR_FILE_NOT_FOUND`（探 `/api/health`），加了只拦 `file:` 协议 4 个端点的短路
+  - `tests/smoke.sh`：15 项自检，不联网、不用浏览器
+  - `tests/check-sync.sh`：校验三份 `annotator.js` 是否同源，`--fix` 自动对齐（文件头用内置常量校验，避免「自己跟自己比」查不出问题）
+
+### 文档
+
+- README（中/英）把**编辑**与**批注**拆成两条独立的线：开头新增决策表，明确「只想要批注时不要跑 `install.py`、不要加载扩展」
+- 标题区分「编辑 · 方式一/二」；批注章节补「装了扩展点 💬」与「没装扩展跑 `annotate.py`」两条路
+
 ## [1.2.0] - 2025
 
 ### 新增

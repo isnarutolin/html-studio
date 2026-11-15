@@ -4,7 +4,7 @@
 
 本地 `.html` 文件、别人分享给你的**网页链接**，都能在页面上直接改：改文字、换字体字号、拖动模块、删掉某一页，`Cmd/Ctrl + S` 就存成本地 `.html` 文件。保存前能看 diff，每一笔改动都有备份。
 
-**也能批注**：划词留意见、回复、标记解决，批注内容跟着稿子走（导出独立 HTML / JSON）；想让大家在同一份稿子上实时看到彼此的批注，起一个本地协作服务就行。
+**也能批注**：划词留意见、回复、标记解决，批注内容跟着稿子走（导出独立 HTML / JSON）；想让大家在同一份稿子上实时看到彼此的批注，起一个本地协作服务就行（**批注不用装扩展**）。
 
 [English](README.en.md) | 简体中文 · [常见问题](docs/FAQ.md) · [更新记录](CHANGELOG.md)
 
@@ -46,9 +46,19 @@
 
 ## 30 秒上手
 
-两个入口，挑一个。
+先说清楚：**编辑**和**批注**是两条独立的线，别装错了。
 
-### 方式一：Chrome 扩展（推荐，能改任意本地 HTML）
+| 你想干什么 | 需要装什么 | 入口 |
+| --- | --- | --- |
+| **编辑**：改文字、换字体、拖模块、删页、写回磁盘 | Chrome 扩展（要 native host 才有写盘权限） | `python3 extension/install.py` + 加载 `extension/` |
+| **网页版编辑**：同上，但不想装扩展 | 只跑一个本地服务 | `python3 server.py --dir ~/Downloads` |
+| **批注（单机）**：划词留意见，导出带批注 HTML | **什么都不用装** | `python3 skills/html-annotate/scripts/annotate.py x.html` |
+| **批注（多人实时）**：同一份稿子互相看到 | **什么都不用装** | `python3 skills/html-annotate/scripts/serve.py --dir ./reports` |
+
+> **只想要批注的话，不要跑 `extension/install.py`、也不要加载扩展。**
+> 批注是一条独立的线：纯 Python 标准库，零依赖，细节见 [批注](#批注在稿子上留意见) / [`skills/html-annotate/SKILL.md`](skills/html-annotate/SKILL.md)。
+
+### 编辑 · 方式一：Chrome 扩展（推荐，能改任意本地 HTML）
 
 ```bash
 git clone https://github.com/isnarutolin/html-studio.git
@@ -73,7 +83,7 @@ python3 extension/install.py     # 注册 native host，让页面有权限写回
 
 卡在哪一步？点浏览器工具栏的**扩展图标**（🧩 → HTML Studio）→ 自检页会实时检查「扩展已加载 / 文件访问权限 / 本地程序连通性」，哪项红了直接告诉你怎么办。命令行等价：`python3 extension/install.py --check`。
 
-### 方式二：本地网页版（不装扩展）
+### 编辑 · 方式二：本地网页版（不装扩展）
 
 ```bash
 python3 server.py --dir ~/Downloads      # 默认端口 7788
@@ -94,10 +104,15 @@ python3 service.py uninstall    # 卸载
 
 编辑是「我改」，批注是「我认为这里要改」。批注不动正文一个字节，只是给文字加一层高亮 + 侧栏意见。
 
+> **批注不需要上面那套扩展，也不需要 native host。** 它只用内联的一份 JS 引擎 + （要多人时才要的）一个纯标准库 Python 服务，所以既能给别人的 HTML 一键加上，也能让 AI 在生成环节里直接调 —— 见 [作为 Agent Skill 用](#作为-agent-skill-用不装扩展不要-node)。
+
 ### 一个人批（默认，不用任何服务）
 
-点右下角 💬（或 `Cmd/Ctrl + Shift + A`）进入批注模式 → 划选文字 → 点浮出的「批注」→ 写意见。
-侧栏可以回复、标记已解决；退出批注模式后高亮会隐起来，正文完全不变。
+**装了扩展**：点右下角 💬（或 `Cmd/Ctrl + Shift + A`）进入批注模式 → 划选文字 → 点浮出的「批注」→ 写意见。
+
+**没装扩展**：`python3 skills/html-annotate/scripts/annotate.py 稿子.html` 会产出 `稿子.annotated.html`，引擎已内联，双击就能批注。
+
+两条路用的是同一个引擎。侧栏都可以回复、标记已解决；退出批注模式后高亮会隐起来，正文完全不变。
 
 批注默认存在浏览器本地（`localStorage`），侧栏顶部三个按钮口可以把它们带走：
 
