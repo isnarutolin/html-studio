@@ -480,7 +480,7 @@ window.__ANNO_DISABLE_AUTOINIT__ = true;
 
   // 连接实时服务（如果检测到后端）
   function connectRemote(base) {
-    if (base == null) base = '';
+    base = normalizeBase(base);
     if (A.remote) return;
     A.remote = { base: base, connected: false, es: null, retry: 0 };
     A.cfg.storageKeyPrefix = A.cfg.storageKeyPrefix; // 保留
@@ -529,8 +529,21 @@ window.__ANNO_DISABLE_AUTOINIT__ = true;
   }
 
   // 探测同源是否有协作后端
+  // 后端地址归一化：页面里可能有 <base href>（代理/保存的稿子会加），
+  // 它会把 '/api/health' 这种相对地址解析到远端域名去，导致跨域被拦、实时接不上。
+  // 所以空 base 一律钉到 location.origin（file: 下为空字符串，走离线兜底）。
+  function normalizeBase(b) {
+    if (!b) {
+      try {
+        var o = global.location && global.location.origin;
+        return /^https?:/i.test(o || '') ? o : '';
+      } catch (e) { return ''; }
+    }
+    return String(b).replace(/\/+$/, '');
+  }
+
   function detectAndConnect(base) {
-    var b = base || '';
+    var b = normalizeBase(base);
     fetch(b + '/api/health', { method: 'GET' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (h) { if (h && h.ok) connectRemote(b); })

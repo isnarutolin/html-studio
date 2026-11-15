@@ -17,6 +17,13 @@
   - `tests/smoke.sh`：15 项自检，不联网、不用浏览器
   - `tests/check-sync.sh`：校验三份 `annotator.js` 是否同源，`--fix` 自动对齐（文件头用内置常量校验，避免「自己跟自己比」查不出问题）
 
+### 修复
+
+- **`<base href>` 会让批注引擎连错后端**：引擎的 `detectAndConnect('')` 用相对地址 `'/api/health'`，一旦页面里有 `<base>`（代理生成的页面、保存的网页必须加）就会被解析到远端域名，跨域被拦 → 实时同步静默失效（只剩本地批注）。
+  现在引擎用 `normalizeBase()` 把空 base 钉到 `location.origin`，`file://` 下退回空串保持离线模式。
+- **`--author` 静默失效**：引擎 init 时 `document.currentScript` 已为 null，读不到 `data-author`。注入器改为预置 `localStorage` 默认署名（仅在用户还未署名时写入）。
+- **`file://` 直开必报 `ERR_FILE_NOT_FOUND`**：引擎会探 `/api/health`。注入器加了只拦 `file:` 协议 4 个端点的 fetch 短路。
+
 ### 文档
 
 - README（中/英）把**编辑**与**批注**拆成两条独立的线：开头新增决策表，明确「只想要批注时不要跑 `install.py`、不要加载扩展」
