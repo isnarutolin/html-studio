@@ -233,6 +233,7 @@
     '.anno-who:hover{background:#F2F3F5;}',
     '.anno-who .anno-av{width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}',
     '.anno-who .anno-who-name{font-size:11px;color:#646A73;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+    '.anno-name-input{width:88px;font:inherit;font-size:11px;color:#1F2329;border:1px solid #4F9CF9;border-radius:6px;padding:1px 4px;outline:none;}',
     '.anno-iconbtn{all:unset;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#646A73;}',
     '.anno-iconbtn:hover{background:#F2F3F5;color:#1F2329;}',
     '.anno-iconbtn[disabled]{opacity:.28;cursor:not-allowed;}',
@@ -424,9 +425,15 @@
       return r.json().catch(function () { return null; });
     }).then(function (j) {
       if (!j || j.ok !== false) return;
-      if (!isRetry && /占用/.test(j.error || '') && askAuthorName()) {
-        renameLocalAuthor(op, A.cfg.author.name);
-        return postOp(op, true);           // 换名后重试，内容不丢
+      if (!isRetry && /占用/.test(j.error || '')) {
+        // 名字被同组其他人占了：提示改名，改完自动重发（不用 prompt，iframe 里也能用）
+        toast('这个名字已被别人用了，请改个署名');
+        askAuthorName(function (ok) {
+          if (!ok) { toast(j.error || '操作被服务端拒绝'); resync(); return; }
+          renameLocalAuthor(op, A.cfg.author.name);
+          postOp(op, true);          // 换名后重试，内容不丢
+        });
+        return;
       }
       toast(j.error || '操作被服务端拒绝');
       resync();
@@ -698,10 +705,10 @@
     var ta = A.els.list.querySelector('.anno-draft textarea');
     var body = ta ? ta.value.trim() : '';
     if (!body) { ta && ta.focus(); return; }
-    // 首次批注且还是临时访客名 → 顺便问一次署名（可取消，取消则继续用访客名）
+    // 首次批注且还是临时访客名 → 不弹窗阻塞提交，先存下，再提示可以改署名
     if (isGuestName(A.cfg.author.name) && !A.askedName) {
       A.askedName = true;
-      askAuthorName(true);
+      toast('当前是临时署名「' + A.cfg.author.name + '」，点侧栏右上角名字可改');
     }
     var ann = {
       id: A.draft.id,
@@ -1107,12 +1114,35 @@
     renderWho();
     return true;
   }
-  function askAuthorName(silent) {
-    var input = null;
-    try { input = window.prompt('你的署名（会显示在你的批注上，方便同事知道是谁提的）', isGuestName(A.cfg.author.name) ? '' : A.cfg.author.name); } catch (e) {}
-    if (input == null) return false;
-    if (!input.trim()) return false;
-    return setAuthorName(input);
+  // 改署名：用侧栏里的内联输入，不用 window.prompt
+  // （prompt 是阻塞式原生弹窗：在 iframe 里会被浏览器忽略→批注静默失败；无头环境直接卡死主线程）
+  // 返回 true 表示编辑器已打开（不等结果），结果通过回调告知
+  function askAuthorName(done) {
+    var el = A.els && A.els.who;
+    if (!el) return false;
+    var old = el.querySelector('input');
+    if (old) { old.focus(); return true; }
+    var cur = isGuestName(A.cfg.author.name) ? '' : A.cfg.author.name;
+    el.innerHTML = '<input class="anno-name-input" maxlength="24" placeholder="你的署名" value="' + esc(cur) + '">';
+    var inp = el.querySelector('input');
+    var finished = false;
+    function finish(save) {
+      if (finished) return;
+      finished = true;
+      var val = (inp.value || '').trim();
+      renderWho();
+      var ok = false;
+      if (save && val) ok = !!setAuthorName(val);
+      if (typeof done === 'function') done(ok);
+    }
+    try { inp.focus(); inp.select(); } catch (e) {}
+    inp.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    inp.addEventListener('blur', function () { finish(true); });
+    return true;
   }
 
   function resolveAuthor() {
