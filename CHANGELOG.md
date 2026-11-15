@@ -2,6 +2,24 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.5.0] - 2025
+
+### 新增
+
+- **扩展不再强制依赖本地程序（native host）**
+  - 没装 `install.py` 时，`Cmd+S` 自动**降级为浏览器下载**（原先只会弹「保存失败：本地程序没注册上」），编辑与批注功能完全可用 → 装扩展只要「加载已解压的扩展程序」一步
+  - 实现上走 background 的 `chrome.downloads` + `data:` URL：content script 自己 `<a download>` 在拿不到用户手势时会被浏览器静默拦掉（实测过），而 **service worker 里没有 `URL.createObjectURL`**（那是 Window API），所以用分块 base64 转 `data:` URL，避免 1MB 级 HTML 爆栈
+- **批注可以同步到自建服务器**（新增选项页 `extension/options.html`）
+  - 填服务器地址（如 `http://127.0.0.1:8899`）+ 勾「开启同步」，之后任意页面点 💬 批注都写进服务器，多人实时可见、可导出；留空则维持原先的纯本地行为
+  - 同步用的 docId 改为 **域名 + 路径**（引擎默认只看 pathname，多个站点同路径会串批注）
+  - 选项页内置「本地程序检测」与「测试连接」，并明确提示局限：`https` 页面连不上 `http` 服务器（mixed content）、服务器需常开
+  - 新增 `storage` / `downloads` 权限与 `host_permissions`
+
+### 文档
+
+- README：扩展安装拆成「加载扩展（必做）+ 装本地程序（可选）」，补充批注同步的开启方式
+- 自检页新增「批注能不能多人共享」一节
+
 ## [1.4.1] - 2025
 
 ### 修复

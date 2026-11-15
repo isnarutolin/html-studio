@@ -62,16 +62,22 @@
 
 ```bash
 git clone https://github.com/isnarutolin/html-studio.git
-cd html-studio
-python3 extension/install.py     # 注册 native host，让页面有权限写回磁盘
 ```
 
-然后在浏览器里做三步：
+加载扩展（必做，两步）：
 
 1. `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选 `extension/` 目录
 2. 扩展卡片 →「详情」→ 打开 **「允许访问文件网址」**
    ← 不开这个，本地页面不会有任何反应，也不会报错
-3. 完全退出浏览器再重开（native host 注册在启动时读取）
+
+装本地程序（可选，只在你想"写回磁盘"时才需要）：
+
+```bash
+cd html-studio
+python3 extension/install.py     # 注册 native host 后，Cmd+S 直接写回原文件（带 diff + 备份）
+```
+
+**没装本地程序也能用**：`Cmd+S` 会降级成浏览器下载（通常是 `~/Downloads/`），编辑和批注功能完全不受影响。
 
 打开任意本地 `.html`，右下角出现 ✎，点它开始编辑。
 
@@ -111,6 +117,9 @@ python3 service.py uninstall    # 卸载
 **装了扩展**：点右下角 💬（或 `Cmd/Ctrl + Shift + A`）进入批注模式 → 划选文字 → 点浮出的「批注」→ 写意见。
 
 **没装扩展**：`python3 skills/html-annotate/scripts/annotate.py 稿子.html` 会产出 `稿子.annotated.html`，引擎已内联，双击就能批注。
+
+**想让扩展的批注也能多人共享**：扩展选项页（`chrome://extensions` → 本扩展「详情」→「扩展程序选项」）里填上批注服务地址（例如 `http://127.0.0.1:8899`），之后任意页面点 💬 批注都会写进服务器。
+留空就是纯本地 —— 批注只存你这个浏览器，换设备/发给同事都看不到。
 
 两条路用的是同一个引擎。侧栏都可以回复、标记已解决；退出批注模式后高亮会隐起来，正文完全不变。
 

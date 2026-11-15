@@ -80,3 +80,32 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   });
   return true; // 异步 sendResponse
 });
+
+// 保存降级：没有 native host 时，content script 把 HTML 发过来，这里用 downloads API 落地。
+// （content script 自己 <a download> 在无用户手势时会被静默拦掉）
+// service worker 里没有 URL.createObjectURL（那是 Window API），所以用 data: URL。
+// 分块转 base64，避免 1MB 级 HTML 一次性 apply 爆栈。
+function toBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+  if (!req || req.type !== 'hs-download') return undefined;
+  try {
+    const url = 'data:text/html;charset=utf-8;base64,' + toBase64(String(req.html || ''));
+    chrome.downloads.download({ url, filename: req.filename || 'page.html', saveAs: false }, (id) => {
+      const err = chrome.runtime.lastError;
+      if (err || id == null) sendResponse({ ok: false, error: err ? err.message : '下载未开始' });
+      else sendResponse({ ok: true, id });
+    });
+  } catch (e) {
+    sendResponse({ ok: false, error: e && e.message ? e.message : String(e) });
+  }
+  return true;
+});

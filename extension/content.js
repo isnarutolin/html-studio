@@ -85,6 +85,31 @@
     range: null,
   };
 
+  /* ---------------- 选项页配置 + 本地程序探测 ---------------- */
+  // 两个能力都可以在不装 native host 的机器上用：
+  //   1) 保存：写盘失败（或没装 host）→ 降级成浏览器下载
+  //   2) 批注：可选同步到你自己的批注服务（8899），不填就是纯本地
+  const CFG = { sync: false, server: '' };
+  let NATIVE_OK = null;   // null = 未探测，false = 不可用
+
+  function loadConfig() {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get({ hsSync: false, hsServer: '' }, (v) => {
+          CFG.sync = !!v.hsSync;
+          CFG.server = String(v.hsServer || '').trim().replace(/\/+$/, '');
+          resolve(CFG);
+        });
+      } catch (e) { resolve(CFG); }
+    });
+  }
+
+  async function probeNative() {
+    try { await call({ op: 'ping' }); NATIVE_OK = true; }
+    catch (e) { NATIVE_OK = false; }
+    return NATIVE_OK;
+  }
+
   /* ---------------- native messaging ---------------- */
   // content script 不能直接调 chrome.runtime.sendNativeMessage（MV3 限制），
   // 必须经 background service worker 转发。
@@ -173,6 +198,14 @@
   function toggle() { S.active ? deactivate() : activate(); }
 
   /* ---------------- 批注模式 ---------------- */
+  // 同步到服务器的文档 ID：用域名 + 路径，这样同一条链接不同人打开会归到同一份批注；
+  // 多个站点用相同路径也不会串（引擎默认只看 pathname）。
+  function annoDocId() {
+    const raw = (location.hostname || '') + (location.pathname || '/');
+    const s = raw.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 120);
+    return s || 'index';
+  }
+
   function ensureAnnotator() {
     if (window.HtmlAnnotator && window.HtmlAnnotator.isInited()) return true;
     if (!window.HtmlAnnotator) {
@@ -180,7 +213,9 @@
       return false;
     }
     try {
-      window.HtmlAnnotator.init({ contentSelector: 'body' });
+      const opts = { contentSelector: 'body', docId: annoDocId() };
+      if (CFG.sync && CFG.server) opts.remote = CFG.server;   // 不填就纯本地
+      window.HtmlAnnotator.init(opts);
     } catch (e) {
       toast('批注初始化失败：' + (e && e.message ? e.message : e), true);
       return false;
@@ -195,7 +230,8 @@
     S.anno = true;
     window.HtmlAnnotator.setActive(true);
     render();
-    toast('批注模式：划选文字 → 点「批注」；再次点 💬 退出');
+    const where = (CFG.sync && CFG.server) ? ' · 同步到 ' + CFG.server : ' · 仅本浏览器可见';
+    toast('批注模式：划选文字 → 点「批注」；再次点 💬 退出' + where);
   }
 
   function exitAnno() {
@@ -379,9 +415,45 @@
       const where = IS_FILE ? '' : ' 到 ' + r.path;
       toast('已保存' + where + stat + (r.backup ? ' · 备份 ' + r.backup : ''));
     } catch (e) {
+      // 没装本地程序（或 host 挂了）→ 降级成下载，不让用户卡在“保存失败”
+      if (isNativeError(e.message)) {
+        NATIVE_OK = false;
+        return downloadFallback();
+      }
       // 目标文件被删/改名了：退化成新建，别把用户的改动卡死
       if (!allowCreate && /文件不存在/.test(e.message)) return saveTo(path, true);
       toast('保存失败：' + e.message, true);
+    }
+  }
+
+  // 原生写入不可用时的人道退路：浏览器下载（目录由浏览器决定，通常是 ~/Downloads）
+  function isNativeError(msg) {
+    return /本地程序|native messaging|本地 host|没有响应|未注册/i.test(String(msg || ''));
+  }
+
+  function fileNameForDownload() {
+    const base = (S.target || (IS_FILE ? sourcePath : defaultRemotePath())).split('/').pop() || 'page.html';
+    return /\.[a-z0-9]+$/i.test(base) ? base : base + '.html';
+  }
+
+  // 交给 background 用 chrome.downloads 落地：
+  // content script 里用 <a download> 点一下，在拿不到用户手势时会被浏览器静默拦掉。
+  function downloadFallback() {
+    try {
+      const html = serialize();
+      const name = fileNameForDownload();
+      chrome.runtime.sendMessage({ type: 'hs-download', html, filename: name }, (resp) => {
+        const err = chrome.runtime.lastError;
+        if (err || !resp || resp.ok === false) {
+          toast('保存失败：' + ((resp && resp.error) || (err && err.message) || '下载被拒绝'), true);
+          return;
+        }
+        S.dirty = false;
+        render();
+        toast('未安装本地程序，已改为下载保存：' + name);
+      });
+    } catch (e) {
+      toast('保存失败：' + (e && e.message ? e.message : e), true);
     }
   }
 
@@ -987,6 +1059,9 @@
     S.origCE = document.body.getAttribute('contenteditable');
     S.origSpell = document.body.getAttribute('spellcheck');
     buildUI();
+    // 配置（批注同步目标）与本地程序可用性：异步拿到即可，不阻塞 UI
+    loadConfig();
+    probeNative();
   }
 
   if (document.readyState === 'loading') {

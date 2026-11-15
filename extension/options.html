@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>HTML Studio · 选项</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 14px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    max-width: 620px; margin: 40px auto; padding: 0 24px 60px; color: #1c1410; background: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e8e6e3; background: #1b1a19; }
+    .card { background: #242322 !important; border-color: #3a3836 !important; }
+    input[type=url] { background: #1b1a19; color: #e8e6e3; border-color: #3a3836; }
+    .hint, .state { color: #9a948e !important; }
+    code { background: #2c2b29 !important; }
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #8b8580; font-size: 13px; margin-bottom: 28px; }
+  .card { border: 1px solid #e6e4e1; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; background: #fafaf9; }
+  .card h2 { font-size: 15px; margin: 0 0 6px; }
+  .hint { color: #8b8580; font-size: 12.5px; margin: 6px 0 0; }
+  label.row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  input[type=url] {
+    width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 7px 10px;
+    border: 1px solid #dcdad7; border-radius: 8px; margin-top: 10px; background: #fff;
+  }
+  .actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  button {
+    font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #dcdad7; background: #fff; color: inherit;
+  }
+  button.primary { background: #d8000f; border-color: #d8000f; color: #fff; }
+  .state { font-size: 12.5px; color: #8b8580; }
+  .ok { color: #1a7f37; } .bad { color: #cf222e; }
+  code { background: #f0efed; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  ul { margin: 8px 0 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+  <h1>HTML Studio · 选项</h1>
+  <div class="sub">这两项都是可选的：不配也能用，只是能力少一点。</div>
+
+  <div class="card">
+    <h2>本地程序（写回磁盘）</h2>
+    <p class="hint" id="nativeState">正在检测…</p>
+    <p class="hint">
+      装了本地程序：<code>Cmd+S</code> 直接写回原文件，带 diff 和自动备份。<br>
+      没装：保存会**降级成浏览器下载**（通常是 <code>~/Downloads</code>），编辑、批注功能都不受影响。
+    </p>
+    <div class="actions">
+      <button id="btnRecheck">重新检测</button>
+      <span class="state" id="nativeHint"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>批注同步到服务器</h2>
+    <label class="row"><input type="checkbox" id="sync"> 开启同步（多人实时看到彼此的批注）</label>
+    <input type="url" id="server" placeholder="http://127.0.0.1:8899" autocomplete="off" spellcheck="false">
+    <p class="hint">
+      留空或关闭 = 批注只存在**你这个浏览器**里（换设备/发给同事都看不到）。<br>
+      填了服务器地址 = 批注写进服务器，谁打开同一个链接都能看到，可多人实时协作。
+    </p>
+    <div class="actions">
+      <button class="primary" id="btnSave">保存</button>
+      <button id="btnTest">测试连接</button>
+      <span class="state" id="testState"></span>
+    </div>
+    <p class="hint">
+      ⚠️ 两个限制：<br>
+      1. <b>https 页面不能连 http 服务器</b>（浏览器 mixed content 拦截）。所以 <code>http://</code> 的页面（例如经 <code>/p/</code> 转换过的链接）最省事；<br>
+      2. 服务器得**一直开着**（合盖休眠就断）。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>怎么用</h2>
+    <ul>
+      <li>任意页面右下角点 <b>✎</b> 进入编辑，<b>💬</b> 进入批注（也可以点工具栏图标 / <code>Cmd+Shift+E</code>）</li>
+      <li>批注模式：划选文字 → 点浮出的「批注」→ 写意见；侧栏可回复、标记已解决</li>
+      <li>编辑与批注互斥：进批注会自动退出编辑</li>
+      <li>本地 <code>file://</code> 页面要先在扩展详情里打开「允许访问文件网址」</li>
+    </ul>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
